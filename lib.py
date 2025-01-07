@@ -414,11 +414,11 @@ class Defuncion:
       return None
 
     if apellido_1 and padre and padre.apellido_1 and apellido_1 != padre.apellido_1:
-      log(f"Apellidos padre e hijo no coinciden: {padre.apellido_1} → {apellido_1}")
+      log(f"Apellidos padre e hijo no coinciden: {padre.apellido_1} -> {apellido_1}")
       print_row(row)
       log()
     if apellido_2 and madre and madre.apellido_1 and apellido_2 != madre.apellido_1:
-      log(f"Apellidos madre e hijo no coinciden: {madre.apellido_1} → {apellido_2}")
+      log(f"Apellidos madre e hijo no coinciden: {madre.apellido_1} -> {apellido_2}")
       print_row(row)
       log()
 
@@ -472,28 +472,28 @@ class Bautizo(Defuncion):
 
     if paterno and paterno.apellido_1:
       if obj.apellido_1 and paterno.apellido_1 != obj.apellido_1:
-        log(f"Apellido abuelo paterno e hijo no coinciden: {paterno.apellido_1} → {obj.apellido_1}")
+        log(f"Apellido abuelo paterno e hijo no coinciden: {paterno.apellido_1} -> {obj.apellido_1}")
         print_row(row)
         log()
       if obj.padre and obj.padre.apellido_1 and paterno.apellido_1 != obj.padre.apellido_1:
-        log(f"Apellido abuelo paterno y padre no coinciden: {paterno.apellido_1} → {obj.padre.apellido_1}")
+        log(f"Apellido abuelo paterno y padre no coinciden: {paterno.apellido_1} -> {obj.padre.apellido_1}")
         print_row(row)
         log()
       if obj.padre and obj.padre.apellido_2 and paterna.apellido_1 != obj.padre.apellido_2:
-        log(f"Apellido abuela paterna y padre no coinciden: {paterna.apellido_1} → {obj.padre.apellido_2}")
+        log(f"Apellido abuela paterna y padre no coinciden: {paterna.apellido_1} -> {obj.padre.apellido_2}")
         print_row(row)
         log()
     if materno and materno.apellido_1:
       if obj.apellido_2 and materno.apellido_1 != obj.apellido_2:
-        log(f"Apellido abuelo materno e hijo no coinciden: {materno.apellido_1} → {obj.apellido_2}")
+        log(f"Apellido abuelo materno e hijo no coinciden: {materno.apellido_1} -> {obj.apellido_2}")
         print_row(row)
         log()
       if obj.madre and obj.madre.apellido_1 and materno.apellido_1 != obj.madre.apellido_1:
-        log(f"Apellido abuela materno y madre no coinciden: {materno.apellido_1} → {obj.madre.apellido_1}")
+        log(f"Apellido abuela materno y madre no coinciden: {materno.apellido_1} -> {obj.madre.apellido_1}")
         print_row(row)
         log()
       if obj.madre and obj.madre.apellido_2 and materna.apellido_1 != obj.madre.apellido_2:
-        log(f"Apellido abuela materna y madre no coinciden: {materna.apellido_1} → {obj.madre.apellido_2}")
+        log(f"Apellido abuela materna y madre no coinciden: {materna.apellido_1} -> {obj.madre.apellido_2}")
         print_row(row)
         log()
 
@@ -675,7 +675,7 @@ def get_person_from_findings(fin: Findings, logger: Logger, name_record: str):
     if fin.broad_matches:
       logger.log_accum(f"No se ha encontrado ningun {name_record} que coincida. Las siguientes opciones han sido descartadas:")
       for x in fin.broad_matches:
-        logger.log_accum(f" → {x}")
+        logger.log_accum(f" -> {x}")
       logger.log_flush()
 
   if len(records) == 0:
@@ -688,7 +688,7 @@ def get_person_from_findings(fin: Findings, logger: Logger, name_record: str):
   else:
     logger.log_accum(f"Varios {name_record}/s encontrados, no se ha elegido ninguno.")
     for r in records:
-      logger.log_accum(f" → {r}")
+      logger.log_accum(f" -> {r}")
     logger.log_flush()
     return None
 
@@ -830,7 +830,7 @@ class Gen:
       if siblings and _INFER_PARENTS_FROM_SIBLINGS:
         logger.log_accum(f"Hermanos potenciales")
         for s in siblings:
-          logger.log_accum(f" → {s}")
+          logger.log_accum(f" -> {s}")
         if len(sets_of_abuelos.keys()) == 1:
           baut_ref = siblings[0]
           inferred_from_siblings = True
@@ -908,13 +908,13 @@ class Gen:
       elif len(matrs) > 1:
         logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno.")
         for m in matrs:
-          logger.log_accum(f" → {m}")
+          logger.log_accum(f"  -> {m}")
       else:
         logger.log_accum(f"Matrimonio de los padres no encontrado. No se pueden deducir los abuelos.")
         if matrs_fin.broad_matches:
           logger.log_accum("Las siguientes opciones han sido descartadas:")
           for x in matrs_fin.broad_matches:
-            logger.log_accum(f" → {x}")
+            logger.log_accum(f"  -> {x}")
         
       logger.log_flush()
 
@@ -1046,7 +1046,7 @@ def get_webpage(tree):
   }
   </script>
 
-  <div id="context" style="font-family:'Open Sans', sans-serif; height:25vh;position: fixed; top: 0; left: 0; right: 0; width: 100%; max-height: 25vh; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border-bottom: 1px solid #ccc; box-sizing: border-box; z-index: 1000;">
+  <div id="context" style="height:25vh;position: fixed; top: 0; left: 0; right: 0; width: 100%; max-height: 25vh; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border-bottom: 1px solid #ccc; box-sizing: border-box; z-index: 1000;">
   ...
   </div>
   <div id="tree" style="font-family: Consolas, 'Courier New', monospace;padding-top: 25vh">
