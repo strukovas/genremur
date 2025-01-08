@@ -12,6 +12,21 @@ _LOGGING = True
 
 _VERIFY_SAME_SURNAMES_PER_ROW = False
 
+####################
+
+# When looking for a person based on parents, if the birth and death certificate
+# of a person is missing, search for siblings and infer the grandparents
+_INFER_PARENTS_FROM_SIBLINGS = True
+
+# Assume that parents must always be >16 years older than children
+_MIN_AGE_PARENTING = 16
+# Assume that parents must always less than 60 years older than children
+# i.e. max age at which they can have a child
+_MAX_AGE_PARENTING = 60
+# How many years can a person live after giving birth
+_MAX_LIFESPAN_AFTER_PARENTING = 60
+
+
 context_map : dict[int, list[str]]= defaultdict(list)
 
 class Logger:
@@ -132,6 +147,9 @@ def remove_de(v):
   v = re.sub(r"\)|\(|\?|\¿","", v, flags=re.IGNORECASE)
   # Remove D. y Dña.
   v = re.sub(r"^(Dña\.|Dña |Doña |Don |D\.|Dº|D )| (Dña\.|Dña |Doña |Don |D\.|Dº|D )"," ", v, flags=re.IGNORECASE)
+  # Remove points
+  v = re.sub(r"…+","", v, flags=re.IGNORECASE)
+  v = re.sub(r"\.+"," ", v, flags=re.IGNORECASE)
 
   # Remove trailing spaces after deleting (if de at the beginning of end)
   v = v.strip()
@@ -149,10 +167,10 @@ def clean_names(v):
 
 
 
-def load_all_sheets_in_colab(bytes):
-  io_buffer = io.BytesIO(bytes)
+def load_all_sheets_in_colab(data_bytes):
+  io_buffer = io.BytesIO(data_bytes)
   # Read all sheets into a dictionary of DataFrames
-  cols_baut = {"Fecha": None,"Observaciones": None,"Año": extract_year}
+  cols_baut = {"N°":None,"Observaciones": None,"Año": extract_year}
   for x in ["Nombre","Apellido 1","Apellido 2", "Nombre Padre", "Nombre Madre",
            "Abuelos Paternos", "Abuelos Maternos"]:
     cols_baut[x] = clean_names
@@ -162,7 +180,7 @@ def load_all_sheets_in_colab(bytes):
   baut.drop_duplicates(inplace=True)
   baut = baut.replace({float('nan'): None})
 
-  cols_matr = {"Fecha": None,"Observaciones": None,"Año": extract_year}
+  cols_matr = {"N°":None,"Observaciones": None,"Año": extract_year}
   for x in ["Nombre_El","Apellido 1_El","Apellido 2_El","Nombre_Ella","Apellido 1_Ella","Apellido 2_Ella", "Padres_El", "Padres_Ella"]:
     cols_matr[x] = clean_names
   matr: pd.DataFrame = pd.read_excel(io_buffer, sheet_name="Matrimonios", converters=cols_matr, usecols=cols_matr)
@@ -171,7 +189,7 @@ def load_all_sheets_in_colab(bytes):
   matr.drop_duplicates(inplace=True)
   matr = matr.replace({float('nan'): None})
 
-  cols_defu = {"Fecha": None,"Observaciones": None,"Año": extract_year}
+  cols_defu = {"N°":None,"Observaciones": None,"Año": extract_year}
   for x in ["Nombre","Apellido 1","Apellido 2", "Nombre Padre", "Nombre Madre"]:
     cols_defu[x] = clean_names
   defu: pd.DataFrame = pd.read_excel(io_buffer, sheet_name="Defunciones", converters=cols_defu, usecols=list(cols_defu.keys()))
@@ -291,11 +309,11 @@ def missing_one_char(str1, str2):
 
 
 def startswith_differ_by_one_char(cell, candidate):
-  if len(cell) != len(candidate):
-    cell = cell.split(" ")[0]
-
   if missing_one_char(cell, candidate):
     return Match.TOTAL
+
+  if len(cell) != len(candidate):
+    cell = cell.split(" ")[0]
 
   if len(cell) != len(candidate):
     return Match.NO
@@ -324,8 +342,9 @@ def match_cell(cell: str, candidate: str):
     return Match.MISSING_INFO
   if not candidate:
     return Match.MISSING_INFO
-  starts_with_candidate = re.match(pattern=f"^{candidate}\\b",string=cell)
-  starts_with_maria_candidate =  re.match(pattern=f"^Maria {candidate}\\b",string=cell)
+
+  starts_with_candidate = re.match(pattern=f"^{re.escape(candidate)}\\b",string=cell)
+  starts_with_maria_candidate =  re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell)
   if starts_with_candidate:
     return Match.TOTAL
   elif candidate in MARIA_FOLLOWUPS and starts_with_maria_candidate:
@@ -373,7 +392,7 @@ class FullName:
     apellido_2 = replace_none(self.apellido_2, "")
     nombre = replace_none(self.nombre, "_")
     origen = f" (de {self.origen})" if self.origen else ""
-    s =  f"{nombre} {apellido_1} {apellido_2}{origen}"
+    s =  " ".join(x for x in [nombre, apellido_1, apellido_2,origen] if x)
     if not self.nombre:
       raise ValueError(f"Unexpected error, there shouldn't be a FullName object without name: {s}")
     return s
@@ -399,6 +418,7 @@ class Defuncion:
   madre: FullName | None = None# Normalmente solo incluye nombre, sin apellidos
   fecha: str | None = None
   observaciones: str | None = None # TODO: Buscar patron XX año(s) para saber edad y estimar nacimiento
+  n_excel: int | None = None
 
   @classmethod
   def defu_from_series(cls, row: pd.Series) -> Optional['Defuncion']:
@@ -434,6 +454,7 @@ class Defuncion:
       fecha=row.get('Fecha'),
       observaciones=row.get('Observaciones'),
       year=year,
+      n_excel=row.get('N') # For some reason it gets converted to N from N°
     )
 
   def __str__(self):
@@ -443,10 +464,11 @@ class Defuncion:
     madre = replace_none(self.madre,"_")
     year = self.year
     if self.observaciones:
-      obs = f" [Observaciones: {self.observaciones}]"
+      obs = f" [{self.observaciones}]"
     else:
       obs = ""
-    return f"{self.nombre} {apellido_1} {apellido_2} ({padre} & {madre}) ({year}){obs}"
+    n_excel = f" #{self.n_excel}" if self.n_excel else ""
+    return f"{self.nombre} {apellido_1} {apellido_2} ({padre} & {madre}) ({year}){obs}{n_excel}"
 
 
 @dataclass
@@ -524,10 +546,11 @@ class Bautizo(Defuncion):
     materna = replace_none(self.materna,"_")
     year = self.year
     if self.observaciones:
-      obs = f" [Observaciones: {self.observaciones}]"
+      obs = f" [{self.observaciones}]"
     else:
       obs = ""
-    return f"{self.nombre} {apellido_1} {apellido_2} ({padre} & {madre}) AbuelosP:({paterno} & {paterna}) AbuelosM:({materno} & {materna}) ({year}){obs}"
+    n_excel = f" #{self.n_excel}" if self.n_excel else ""
+    return f"{self.nombre} {apellido_1} {apellido_2} ({padre} & {madre}) AP:({paterno} & {paterna}) AM:({materno} & {materna}) ({year}){obs}{n_excel}"
 
 import uuid
 @dataclass
@@ -563,20 +586,6 @@ class Sheets:
   defu_by_year: dict[int, list[Defuncion]]
   matr_by_year: dict[int, dict]
 
-####################
-
-# When looking for a person based on parents, if the birth and death certificate
-# of a person is missing, search for siblings and infer the grandparents
-_INFER_PARENTS_FROM_SIBLINGS = True
-
-# Assume that parents must always be >16 years older than children
-_MIN_AGE_PARENTING = 16
-# Assume that parents must always be >16 years older than children
-_MAX_AGE_PARENTING = 60
-# How many years can a person live after giving birth
-_MAX_LIFESPAN_AFTER_PARENTING = 60
-
-
 
 
 
@@ -606,10 +615,10 @@ def get_dummy_tree(info: SearchInfo) -> Tree:
 
 
 
-def get_tree_parent_limited_v2(parent: FullName, apellido_parent: str):
+def get_tree_parent_limited(parent: FullName):
   padre_info = SearchInfo(
       nombre=parent.nombre,
-      apellido_1=apellido_parent,
+      apellido_1=parent.apellido_1,
       apellido_2=parent.apellido_2)
   return get_dummy_tree(padre_info)
 
@@ -670,27 +679,24 @@ def find_person_abstract_v2(sheet: dict, info: SearchInfo, year_range:Tuple[int,
 
 
 def get_person_from_findings(fin: Findings, logger: Logger, name_record: str):
+  broad_match= ""
   if fin.full_matches:
     records = fin.full_matches
   elif fin.partial_matches:
     records = fin.partial_matches
   else:
-    records = []
-    if fin.broad_matches:
-      logger.log_accum(f"No se ha encontrado ningun {name_record} que coincida. Las siguientes opciones han sido descartadas:")
-      for x in fin.broad_matches:
-        logger.log_accum(f" → {x}")
-      logger.log_flush()
+    records = fin.broad_matches
+    broad_match = " (concindencia parcial) "
 
   if len(records) == 0:
     return None
   elif len(records) == 1:
-    logger.log_accum(f"{name_record.title()} encontrado:")
+    logger.log_accum(f"{name_record.title()} encontrado{broad_match}:")
     logger.log_accum(records[0])
     logger.log_flush()
     return records[0]
   else:
-    logger.log_accum(f"Varios {name_record}/s encontrados, no se ha elegido ninguno.")
+    logger.log_accum(f"Varios {name_record}/s encontrados{broad_match}, no se ha elegido ninguno.")
     for r in records:
       logger.log_accum(f" → {r}")
     logger.log_flush()
@@ -713,7 +719,6 @@ class Gen:
       year_range = (info.year_child-1, info.year_child+_MAX_LIFESPAN_AFTER_PARENTING)
     return find_person_abstract_v2(self.sheets.defu_by_year, info, year_range)
 
-  # TODO
   def find_matr(self,padre:FullName, madre: FullName, year_child):
     year_range = None
     if year_child:
@@ -732,6 +737,7 @@ class Gen:
         min_year, max_year = year_range
         if not (min_year <= year <= max_year):
           continue
+
       for r in baut:
         man_name_match = match_cell(r["Nombre_El"], padre.nombre)
         man_surnames_match = [
@@ -758,34 +764,11 @@ class Gen:
     return Findings(full_matches, partial_matches, broad_matches)
 
 
-
-  def get_tree_parent_from_baut(self, abuelos: str, apellido_parent: str, parent: str, year:int):
-    padre = split_name_surnames(parent)
-    if abuelos := get_abuelos(abuelos):
-      abuelo, abuela = abuelos
-      if abuela.apellido_1 and padre.apellido_2:
-        assert abuela.apellido_1 == padre.apellido_2
-      padre_info = SearchInfo(
-          nombre=padre.nombre,
-          apellido_1=apellido_parent,
-          apellido_2=abuela.apellido_1,
-          nombre_padre=abuelo.nombre,
-          nombre_madre=abuela.nombre,
-          year_child=year)
-      return self.get_ancestors(padre_info)
-    else:
-      padre_info = SearchInfo(
-          nombre=padre.nombre,
-          apellido_1=apellido_parent,
-          apellido_2=padre.apellido_2 # Unlikely
-          )
-      return get_dummy_tree(padre_info)
-
   def get_tree_parent_from_baut_v2(self, abuelo: FullName, abuela: FullName, apellido_parent: str, parent: FullName, year:int):
     padre_info = SearchInfo(
         nombre=parent.nombre,
-        apellido_1=apellido_parent,
-        apellido_2=abuela.apellido_1,
+        apellido_1=parent.apellido_1 or abuelo.apellido_1 or apellido_parent,
+        apellido_2=parent.apellido_2 or abuela.apellido_1,
         nombre_padre=abuelo.nombre,
         nombre_madre=abuela.nombre,
         year_child=year)
@@ -820,18 +803,16 @@ class Gen:
       n_siblings = len(siblings)-(1 if baut else 0)
 
 
-
-    # Group potential siblings based on grandparents to avoid people with
-    # same parents but different grandparents.
-    # TODO: Make use of this information
-    sets_of_abuelos = get_sets_abuelos(siblings)
-
     # If no birth was found try to infer parents from siblings, currently it
     # uses the first sibling TODO:Make it smarter, e.g. choose one with grandparents cells
     baut_ref = baut
     inferred_from_siblings = False
     if not baut_ref:
       if siblings and _INFER_PARENTS_FROM_SIBLINGS:
+        # Group potential siblings based on grandparents to avoid people with
+        # same parents but different grandparents.
+        # TODO: Make use of this information
+        sets_of_abuelos = get_sets_abuelos(siblings)
         logger.log_accum(f"Hermanos potenciales")
         for s in siblings:
           logger.log_accum(f" → {s}")
@@ -864,63 +845,71 @@ class Gen:
         logger.log_flush()
 
 
-    if not baut_ref and not defuncion:
-      return get_dummy_tree(info)
+    r = baut_ref or defuncion
+    apellido_1 = r.apellido_1 if r and r.apellido_1 else info.apellido_1
+    apellido_2 = r.apellido_2 if r and r.apellido_2 else info.apellido_2
+    year_birth = baut_ref.year if baut_ref else None
+    if r and r.padre:
+      zpadre = replace(r.padre, apellido_1=r.padre.apellido_1 or info.apellido_1)
+    else:
+      zpadre = FullName(info.nombre_padre, info.apellido_1)
+    if r and r.madre:
+      zmadre = replace(r.madre, apellido_1=r.madre.apellido_1 or info.apellido_2)
+    else:
+      zmadre = FullName(info.nombre_madre, info.apellido_2)
+    
+    # If we don't find anyhting better we just keep this
+    padre = get_tree_parent_limited(zpadre)
+    madre = get_tree_parent_limited(zmadre)
 
 
-    has_maternos = baut_ref.materno and baut_ref.materna
-    has_paternos = baut_ref.paterno and baut_ref.paterna
+    has_maternos = baut_ref and baut_ref.materno and baut_ref.materna
+    has_paternos = baut_ref and baut_ref.paterno and baut_ref.paterna
     # TODO: Clarify the whole float.nan, "nan", "Missing" situation to make it clear
-    if baut_ref and has_paternos:
-      padre = self.get_tree_parent_from_baut_v2(baut_ref.paterno, baut_ref.paterna, baut_ref.apellido_1, baut_ref.padre, baut_ref.year)
-    else:
-      if baut_ref:
-        padre = get_tree_parent_limited_v2(baut_ref.padre, baut_ref.apellido_1)
+    if has_paternos:
+      padre = self.get_tree_parent_from_baut_v2(baut_ref.paterno, baut_ref.paterna, baut_ref.apellido_1, baut_ref.padre, year_birth)
+
+    if has_maternos:
+      madre = self.get_tree_parent_from_baut_v2(baut_ref.materno, baut_ref.materna, baut_ref.apellido_2, baut_ref.madre, year_birth)
+
+    #if not baut_ref or not baut_ref.padre or not baut_ref.madre or not has_maternos or not has_paternos:
+    # Try to find abuelos from marrage of parents
+    # Sometimes the parent cell contains the surname(s)
+    matrs_fin = self.find_matr(zpadre, zmadre, year_child=year_birth)
+    matrs = matrs_fin.full_matches or matrs_fin.partial_matches
+    if len(matrs) == 1:
+      matr = matrs[0]
+      if has_paternos or has_maternos: #No necesitamos inferir nada, solo informacion
+        logger.log_accum(f"Encontrado matrimonio de los padres.")
+      elif not (matr["Padres_Ella"] or type(matr["Padres_Ella"]) is not float):
+        logger.log_accum(f"Encontrado matrimonio de los padres pero NO aparecen los abuelos..")
+        logger.log_accum(matr)
       else:
-        padre = get_tree_parent_limited_v2(defuncion.padre, defuncion.apellido_1)
+        logger.log_accum(f"Encontrado matrimonio de los padres. Deducido los abuelos.")
+        logger.log_accum(matr)
+        abuelos_paternos = matr["Padres_El"]
+        abuelos_maternos = matr["Padres_Ella"]
+        if paternos := get_abuelos(abuelos_paternos):
+          paterno,paterna = paternos
+          padre = self.get_tree_parent_from_baut_v2(paterno,paterna,apellido_1, zpadre, year_birth)
+        if maternos := get_abuelos(abuelos_maternos):
+          materno,materna = maternos
+          madre = self.get_tree_parent_from_baut_v2(materno,materna, apellido_2, zmadre, year_birth)
+    elif len(matrs) > 1:
+      logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno.")
+      for m in matrs:
+        logger.log_accum(f" → {m}")
+    elif not has_maternos or not has_maternos:
+      logger.log_accum(f"Matrimonio de los padres no encontrado. No se pueden deducir los abuelos.")
+      if matrs_fin.broad_matches:
+        logger.log_accum("Las siguientes opciones han sido descartadas:")
+        for x in matrs_fin.broad_matches:
+          logger.log_accum(f" → {x}")
 
+    logger.log_flush()
 
-    if baut_ref and has_maternos:
-      madre = self.get_tree_parent_from_baut_v2(baut_ref.materno, baut_ref.materna, baut_ref.apellido_2, baut_ref.madre, baut_ref.year)
-    else:
-      if baut_ref:
-        madre = get_tree_parent_limited_v2(baut_ref.madre, baut_ref.apellido_2)
-      else:
-        madre = get_tree_parent_limited_v2(defuncion.madre, defuncion.apellido_2)
-
-    # TODO: Make it work with deaths
-    if baut_ref and not has_maternos:
-      r = baut_ref
-      # Try to find abuelos from marrage of parents
-      # Sometimes the parent cell contains the surname(s)
-      matrs_fin = self.find_matr(
-          replace(baut_ref.padre, apellido_1=r.apellido_1),
-          replace(baut_ref.madre, apellido_1=r.apellido_2),
-          year_child=r.year if baut_ref else None)
-      matrs = matrs_fin.full_matches or matrs_fin.partial_matches
-      if len(matrs) == 1:
-        matr = matrs[0]
-        if not (matr["Padres_Ella"] or type(matr["Padres_Ella"]) is not float):
-          logger.log_accum(f"Encontrado matrimonio de los padres pero NO aparecen los abuelos..")
-        else:
-          logger.log_accum(f"Encontrado matrimonio de los padres. Deducido los abuelos.")
-          logger.log_accum(matr)
-          abuelos_paternos = matr["Padres_El"]
-          abuelos_maternos = matr["Padres_Ella"]
-          padre = self.get_tree_parent_from_baut(abuelos_paternos,r.apellido_1, r.padre.nombre, r.year)
-          madre = self.get_tree_parent_from_baut(abuelos_maternos, r.apellido_2, r.madre.nombre, r.year)
-      elif len(matrs) > 1:
-        logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno.")
-        for m in matrs:
-          logger.log_accum(f" → {m}")
-      else:
-        logger.log_accum(f"Matrimonio de los padres no encontrado. No se pueden deducir los abuelos.")
-        if matrs_fin.broad_matches:
-          logger.log_accum("Las siguientes opciones han sido descartadas:")
-          for x in matrs_fin.broad_matches:
-            logger.log_accum(f" → {x}")
-
-      logger.log_flush()
+    #if not baut_ref and not defuncion:
+    #  return get_dummy_tree(info)
 
     # To log the name of the person in the tree
     if not baut:

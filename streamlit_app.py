@@ -1,25 +1,24 @@
+import streamlit.components.v1 as components
 import streamlit as st
 import pandas as pd
 import lib
-#import pip
-#pip.main(["install", "openpyxl"])
+# import pip
+# pip.main(["install", "openpyxl"])
 st.set_page_config(layout="wide")
 # Show title and description.
 st.title("(GenReMur) Buscador Recursivo de antepasados Murcia")
-st.markdown(
-    "Descarga el archivos Excel del pueblo que te interese [aquí](https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469). Una vez lo tengas súbelo a esta web. A continuación introduce los datos de una persona que aparece en ese Excel y la aplicación buscará los datos de sus padres, abuelos, bisabuelos, etc."
+st.markdown("""
+            Descarga el archivos Excel del pueblo que te interese [aquí](https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469). 
+            Confirma que está en el Excel la persona cuyos ancestros quieres buscar. A continuación sube el Excel a esta web e introduce los datos de dicha persona. 
+            La aplicación buscará los datos de sus padres, abuelos, bisabuelos, etc. 
+            La documentación del programa está disponible [aquí](https://github.com/strukovas/genremur#GenReMur).  \n
+            ¿Te interesa simplemente ver un ejemplo? Busca en Abarán a Aurelio Castaño Molina (padres Antonio y Trinidad).
+            """
 )
 
-import streamlit.components.v1 as components
 
-
-
-
-
-def set_key(k,v):
+def set_key(k, v):
     st.session_state[k] = v
-
-
 
 
 @st.fragment
@@ -29,12 +28,12 @@ def bar():
         "", type=("xlsx"),
         help="Algunos tips"
     )
-    
 
     if uploaded_file:
         with st.spinner('(1) Cargando Excel, limpiando datos, marcando datos ausentes, estandarizando nombres...'):
-            baut_all,matr_all,defu_all = lib.load_all_sheets_in_colab(uploaded_file.read())
-            
+            baut_all, matr_all, defu_all = lib.load_all_sheets_in_colab(
+                uploaded_file.read())
+
         with st.spinner('(2) Separando nombre y apellidos, agrupando datos por año... '):
             from collections import defaultdict
             defu_by_year: dict[int, list] = defaultdict(list)
@@ -48,14 +47,21 @@ def bar():
                     if x := lib.Bautizo.baut_from_series(row):
                         baut_by_year[year].append(x)
 
-            matr_by_year = {year: group.to_dict('records') for year, group in matr_all.groupby('Año')}
-            sheets = lib.Sheets(baut_by_year=baut_by_year, matr_by_year=matr_by_year, defu_by_year=defu_by_year)
-            set_key("sheets",sheets)
+            matr_by_year = {year: group.to_dict(
+                'records') for year, group in matr_all.groupby('Año')}
+            sheets = lib.Sheets(
+                baut_by_year=baut_by_year, matr_by_year=matr_by_year, defu_by_year=defu_by_year)
+            set_key("sheets", sheets)
 
-            year_baut = ", ".join(lib.get_year_ranges(list(baut_by_year.keys())))
-            year_matr = ", ".join(lib.get_year_ranges(list(matr_by_year.keys())))
-            year_defu = ", ".join(lib.get_year_ranges(list(defu_by_year.keys())))
-            st.markdown(f"Excel procesado con éxito. Encontrado:  \n{len(baut_all)} Bautizos ({year_baut})  \n{len(matr_all)} Matrimonios ({year_matr})  \n{len(defu_all)} Defunciones ({year_defu})")
+            year_baut = ", ".join(
+                lib.get_year_ranges(list(baut_by_year.keys())))
+            year_matr = ", ".join(
+                lib.get_year_ranges(list(matr_by_year.keys())))
+            year_defu = ", ".join(
+                lib.get_year_ranges(list(defu_by_year.keys())))
+            st.markdown(
+                f"Excel procesado con éxito. Encontrado:  \n{len(baut_all)} Bautizos ({year_baut})  \n{len(matr_all)} Matrimonios ({year_matr})  \n{len(defu_all)} Defunciones ({year_defu})")
+
 
 @st.fragment
 def foo():
@@ -63,15 +69,17 @@ def foo():
         col1, col2, col3 = st.columns(3)
         with col1:
             nombre_val = st.text_input("Nombre")
-            nombre_padre_val = st.text_input("Nombre Padre")
+            nombre_padre_val = st.text_input("Nombre Padre (sin apellidos)")
         with col2:
             apellido_1_val = st.text_input("Apellido 1")
-            nombre_madre_val = st.text_input("Nombre Madre")
+            nombre_madre_val = st.text_input("Nombre Madre (sin apellidos)")
         with col3:
-            apellido_2_val = st.text_input("Apellido 2",)
-            st.write('<div style="height: 28px;"></div>', unsafe_allow_html=True)
-            submitted = st.form_submit_button("Buscar",use_container_width=True)
-        
+            apellido_2_val = st.text_input("Apellido 2")
+            st.write('<div style="height: 28px;"></div>',
+                     unsafe_allow_html=True)
+            submitted = st.form_submit_button(
+                "Buscar", use_container_width=True)
+
     if submitted:
         if "sheets" in st.session_state:
             error = ""
@@ -83,16 +91,16 @@ def foo():
                 error += "Campo 'Apellido 1' vacío.  \n"
                 n_missing += 1
             if not apellido_2_val:
-                error += "Campo 'Apellido 2' vacío.  \n"    
+                error += "Campo 'Apellido 2' vacío.  \n"
                 n_missing += 1
             if not nombre_padre_val:
-                error += "Campo 'Nombre Padre' vacío.  \n"  
+                error += "Campo 'Nombre Padre' vacío.  \n"
                 n_missing += 1
             if not nombre_madre_val:
-                error += "Campo 'Nombre Madre' vacío.  \n"  
+                error += "Campo 'Nombre Madre' vacío.  \n"
                 n_missing += 1
-            if n_missing > 1:
-                error += "**No puede haber más de 1 campo vacío**.  \n"
+            if n_missing > 2:
+                error += "**No puede haber más de 2 campos vacío**. Intenta rellenarlos todos.  \n"
                 st.markdown(error)
             else:
                 nombre = (nombre_val if nombre_val else "_")
@@ -110,18 +118,21 @@ def foo():
                     webpage = lib.get_webpage(z)
                     size = lib.get_tree_size(z)
                     if size <= 3:
-                        st.markdown("**No se ha encontrado a esta persona en el Excel**")
+                        st.markdown(
+                            "**No se ha encontrado a esta persona en el Excel**")
                     else:
                         st.markdown(f"Deducido árbol con {size} miembros")
                 components.html(webpage, height=700, scrolling=True)
         else:
-            st.markdown("**Antes de continuar debes subir un Excel en el que buscar**.")
+            st.markdown(
+                "**Antes de continuar debes subir un Excel en el que buscar**.")
+
 
 bar()
 foo()
 
 st.markdown(
-        """
+    """
         <style>
         .stAppHeader {
         display:None} 
@@ -150,12 +161,7 @@ st.markdown(
         padding-left:0rem !important;
                padding-right:0.1rem !important;
         }
-        </style>
-        
-        """, unsafe_allow_html=True
-    )
-css="""
-<style>
+
 
 [data-testid="stFileUploaderDropzone"] div div::before {
 content:"Sube un Excel de indexaciones"}
@@ -174,5 +180,4 @@ display:none;}
 [data-testid="stFileUploaderDropzone"] div div::after { font-size: .8em; content:"Límite 200MB"}
 [data-testid="stFileUploaderDropzone"] div div small{display:none;}
 </style>
-"""
-st.markdown(css, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
