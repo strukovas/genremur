@@ -10,6 +10,8 @@ from typing import Tuple
 # Wheter to print logs
 _LOGGING = True
 
+_VERIFY_SAME_SURNAMES_PER_ROW = False
+
 context_map : dict[int, list[str]]= defaultdict(list)
 
 class Logger:
@@ -297,13 +299,13 @@ def startswith_differ_by_one_char(cell, candidate):
 
   if len(cell) != len(candidate):
     return Match.NO
-  
+
 
   last_two_chars = sorted([cell[-1], candidate[-1]])
   # Cannot match Antonia y Antonio
   if last_two_chars == ["a","o"]:
     return Match.NO
-  
+
   # Avoid Fernandez y Hernandez
   if sorted([cell, candidate]) == ["Fernandez","Hernandez"]:
     return Match.MISSING_INFO
@@ -409,18 +411,19 @@ class Defuncion:
     apellido_1=row.get('Apellido_1')
     apellido_2=row.get('Apellido_2')
 
-    if not nombre or not year:
-      log(f"Fila descartada, falta nombre o año:\n{row}")
-      return None
+    if _VERIFY_SAME_SURNAMES_PER_ROW:
+      if not nombre or not year:
+        log(f"Fila descartada, falta nombre o año:\n{row}")
+        return None
 
-    if apellido_1 and padre and padre.apellido_1 and apellido_1 != padre.apellido_1:
-      log(f"Apellidos padre e hijo no coinciden: {padre.apellido_1} -> {apellido_1}")
-      print_row(row)
-      log()
-    if apellido_2 and madre and madre.apellido_1 and apellido_2 != madre.apellido_1:
-      log(f"Apellidos madre e hijo no coinciden: {madre.apellido_1} -> {apellido_2}")
-      print_row(row)
-      log()
+      if apellido_1 and padre and padre.apellido_1 and apellido_1 != padre.apellido_1:
+        log(f"Apellidos padre e hijo no coinciden: {padre.apellido_1} → {apellido_1}")
+        print_row(row)
+        log()
+      if apellido_2 and madre and madre.apellido_1 and apellido_2 != madre.apellido_1:
+        log(f"Apellidos madre e hijo no coinciden: {madre.apellido_1} → {apellido_2}")
+        print_row(row)
+        log()
 
     return cls(
       nombre=nombre,
@@ -470,32 +473,33 @@ class Bautizo(Defuncion):
     else:
       materno, materna = None, None
 
-    if paterno and paterno.apellido_1:
-      if obj.apellido_1 and paterno.apellido_1 != obj.apellido_1:
-        log(f"Apellido abuelo paterno e hijo no coinciden: {paterno.apellido_1} -> {obj.apellido_1}")
-        print_row(row)
-        log()
-      if obj.padre and obj.padre.apellido_1 and paterno.apellido_1 != obj.padre.apellido_1:
-        log(f"Apellido abuelo paterno y padre no coinciden: {paterno.apellido_1} -> {obj.padre.apellido_1}")
-        print_row(row)
-        log()
-      if obj.padre and obj.padre.apellido_2 and paterna.apellido_1 != obj.padre.apellido_2:
-        log(f"Apellido abuela paterna y padre no coinciden: {paterna.apellido_1} -> {obj.padre.apellido_2}")
-        print_row(row)
-        log()
-    if materno and materno.apellido_1:
-      if obj.apellido_2 and materno.apellido_1 != obj.apellido_2:
-        log(f"Apellido abuelo materno e hijo no coinciden: {materno.apellido_1} -> {obj.apellido_2}")
-        print_row(row)
-        log()
-      if obj.madre and obj.madre.apellido_1 and materno.apellido_1 != obj.madre.apellido_1:
-        log(f"Apellido abuela materno y madre no coinciden: {materno.apellido_1} -> {obj.madre.apellido_1}")
-        print_row(row)
-        log()
-      if obj.madre and obj.madre.apellido_2 and materna.apellido_1 != obj.madre.apellido_2:
-        log(f"Apellido abuela materna y madre no coinciden: {materna.apellido_1} -> {obj.madre.apellido_2}")
-        print_row(row)
-        log()
+    if _VERIFY_SAME_SURNAMES_PER_ROW:
+      if paterno and paterno.apellido_1:
+        if obj.apellido_1 and paterno.apellido_1 != obj.apellido_1:
+          log(f"Apellido abuelo paterno e hijo no coinciden: {paterno.apellido_1} → {obj.apellido_1}")
+          print_row(row)
+          log()
+        if obj.padre and obj.padre.apellido_1 and paterno.apellido_1 != obj.padre.apellido_1:
+          log(f"Apellido abuelo paterno y padre no coinciden: {paterno.apellido_1} → {obj.padre.apellido_1}")
+          print_row(row)
+          log()
+        if obj.padre and obj.padre.apellido_2 and paterna.apellido_1 != obj.padre.apellido_2:
+          log(f"Apellido abuela paterna y padre no coinciden: {paterna.apellido_1} → {obj.padre.apellido_2}")
+          print_row(row)
+          log()
+      if materno and materno.apellido_1:
+        if obj.apellido_2 and materno.apellido_1 != obj.apellido_2:
+          log(f"Apellido abuelo materno e hijo no coinciden: {materno.apellido_1} → {obj.apellido_2}")
+          print_row(row)
+          log()
+        if obj.madre and obj.madre.apellido_1 and materno.apellido_1 != obj.madre.apellido_1:
+          log(f"Apellido abuela materno y madre no coinciden: {materno.apellido_1} → {obj.madre.apellido_1}")
+          print_row(row)
+          log()
+        if obj.madre and obj.madre.apellido_2 and materna.apellido_1 != obj.madre.apellido_2:
+          log(f"Apellido abuela materna y madre no coinciden: {materna.apellido_1} → {obj.madre.apellido_2}")
+          print_row(row)
+          log()
 
 
     return cls(
@@ -675,7 +679,7 @@ def get_person_from_findings(fin: Findings, logger: Logger, name_record: str):
     if fin.broad_matches:
       logger.log_accum(f"No se ha encontrado ningun {name_record} que coincida. Las siguientes opciones han sido descartadas:")
       for x in fin.broad_matches:
-        logger.log_accum(f" -> {x}")
+        logger.log_accum(f" → {x}")
       logger.log_flush()
 
   if len(records) == 0:
@@ -688,7 +692,7 @@ def get_person_from_findings(fin: Findings, logger: Logger, name_record: str):
   else:
     logger.log_accum(f"Varios {name_record}/s encontrados, no se ha elegido ninguno.")
     for r in records:
-      logger.log_accum(f" -> {r}")
+      logger.log_accum(f" → {r}")
     logger.log_flush()
     return None
 
@@ -738,7 +742,7 @@ class Gen:
             match_cell(r["Apellido_1_Ella"], madre.apellido_1),
              (match_cell(r["Apellido_2_Ella"], madre.apellido_2))]
         this_matches = [man_name_match, woman_name_match]+man_surnames_match+woman_surnames_match
-          
+
         if Match.NO in this_matches:
           continue
         if Match.TOTAL in this_matches and Match.MISSING_INFO not in this_matches:
@@ -815,7 +819,7 @@ class Gen:
     if siblings:
       n_siblings = len(siblings)-(1 if baut else 0)
 
-    
+
 
     # Group potential siblings based on grandparents to avoid people with
     # same parents but different grandparents.
@@ -830,7 +834,7 @@ class Gen:
       if siblings and _INFER_PARENTS_FROM_SIBLINGS:
         logger.log_accum(f"Hermanos potenciales")
         for s in siblings:
-          logger.log_accum(f" -> {s}")
+          logger.log_accum(f" → {s}")
         if len(sets_of_abuelos.keys()) == 1:
           baut_ref = siblings[0]
           inferred_from_siblings = True
@@ -908,14 +912,14 @@ class Gen:
       elif len(matrs) > 1:
         logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno.")
         for m in matrs:
-          logger.log_accum(f"  -> {m}")
+          logger.log_accum(f" → {m}")
       else:
         logger.log_accum(f"Matrimonio de los padres no encontrado. No se pueden deducir los abuelos.")
         if matrs_fin.broad_matches:
           logger.log_accum("Las siguientes opciones han sido descartadas:")
           for x in matrs_fin.broad_matches:
-            logger.log_accum(f"  -> {x}")
-        
+            logger.log_accum(f" → {x}")
+
       logger.log_flush()
 
     # To log the name of the person in the tree
@@ -1046,7 +1050,7 @@ def get_webpage(tree):
   }
   </script>
 
-  <div id="context" style="height:25vh;position: fixed; top: 0; left: 0; right: 0; width: 100%; max-height: 25vh; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border-bottom: 1px solid #ccc; box-sizing: border-box; z-index: 1000;">
+  <div id="context" style="border: solid 1px; font-family:'Open Sans', sans-serif; height:25vh;position: fixed; top: 0; left: 0; right: 0; width: 100%; max-height: 25vh; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border-bottom: 1px solid #ccc; box-sizing: border-box; z-index: 1000;">
   ...
   </div>
   <div id="tree" style="font-family: Consolas, 'Courier New', monospace;padding-top: 25vh">
@@ -1075,3 +1079,27 @@ def get_webpage(tree):
   </html>
   """
   return c
+
+def get_year_ranges(nums) -> []:
+  if not nums:
+      return []
+  
+  ranges = []
+  start = nums[0]
+  
+  for i in range(1, len(nums)):
+      if nums[i] != nums[i - 1] + 1:  # Check if the current number is not consecutive
+          end = nums[i - 1]
+          if start == end:
+              ranges.append(str(start))  # Single number range
+          else:
+              ranges.append(f"{start}-{end}")  # Range from start to end
+          start = nums[i]
+  
+  # Add the last range
+  if start == nums[-1]:
+      ranges.append(str(start))
+  else:
+      ranges.append(f"{start}-{nums[-1]}")
+  
+  return ranges
