@@ -14,56 +14,58 @@ Antes de usar el programa lo primero es entender si el Excel que se utiliza cont
 #### Apellidos compuestos
 En los campos de padres y abuelos, el programa espera nombres de 3 palabras como máximo, o de 4 si la segunda palabra está ne la lista de nombres compuestos. Por lo tanto, no es capaz de detectar apellidos compuestos (excepto que estuvieran siempre unidos con un guion como Marin-Ordoñez).
 
-#### Datos particalmente ausentes en Excel
-Aunque los padres o abuelos estén presentes en FamilySearch, si estos no aparecen en sus columnas correspondientes en el Excel, el programa no los puede detectar. El programa no puede obtener está información del campo observaciones tampoco.
+#### Datos ausentes en Excel
+Aunque los padres o abuelos estén presentes en la imagen de FamilySearch, si estos no aparecen en sus columnas correspondientes en el Excel, el programa no los puede detectar. El programa no puede obtener está información del campo observaciones tampoco.
 
 #### Casos no obvios
 El programa es conservador y solo acepta coincidencias si las diferencias son pequeñas: 1 letra de diferencia o un campo vacío. Por lo tanto, si los datos indexados no están muy completos o no es un caso fácil, es improbable que funcione.
 
 
 ### Preguntas frequentes
-#### Por qué a mi no me funciona?
+#### ¿Por qué a mi no me funciona?
 Pueden haber varios motivos por los que no funcione. En primer lugar, la persona que se busca debe aparece en el Excel (con padres y abuelos). En segundo lugar revisa la sección limitaciones para entender lo que puede y no puede hacer el programa. También ten en cuenta que la mayoría de Excels no estan 100% completos y faltan años.
 
 #### ¿Dónde descargo el Excel?
 https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469
 
-#### ¿Puede mejorar el programa?
-Aunque el programa tiene mucho margen de mejora, al final es una lucha infinita contra los datos libremente escritos en el Excel. La mejor forma de conseguir que el programa funcione mejor es limpiando los datos del Excel. 
+#### ¿Como puedo hacer que funcione mejor el programa?
+Aunque el programa tiene mucho margen de mejora, al final es una lucha infinita contra los datos libremente escritos en el Excel. La mejor forma de conseguir que el programa funcione mejor es limpiando los datos del Excel. Pero si tienes
 
-### Detalles técnicos (como funciona)
+### Detalles técnicos (funcionamiento)
 #### Lógica
 La lógica del programa es la siguiente. Dada una persona (nombre, apellido 1, apellido 2) y el nombre de sus padres (obligatorio 4 de los 5 campos):
  1. Busca bautizo
  2. Busca defunción
  3. Busca hermanos (alguien con mismos padres y mismos apellidos)
   3.1 Solo acepta hermanos si los abuelos de todos los candidatos coinciden
- 4. Busca matrimonio de los padres (si bautizo no encontrado o faltan abuelos en este)
+ 4. Busca matrimonio de los padres
  5. Si abuelos encontrado en bautizo o matrimonio repite la busqueda para el padre y la madre
 
 #### Definicion de coincidencia
 ##### Coincidencia por celda
 Se considera que el nombre o apellido que aparece en una celda coincide la palabra/s candidatas si:
- - Empieza por la misma palabra
+ - Empieza por la misma palabra:
   - Juan es Juan? ✓
   - Juan es Juan Luis? ✓
+  - Juan es Juana? ✗
   - Juan Luis es Juan? ✗
   - Maria es Maria Dolores? ✓
- - Empieza por la misma palabra + Maria (solo para algunos nombre predefinidos)
+ - Empieza por la misma palabra + Maria (solo para algunos nombre predefinidos):
   - Encarnacion es Maria Encarnacion? ✓
   - Dolores es Maria Dolores? ✓
   - Dolores es Maria? ✗
- - Cambia solo en una letra (excepto si cambia en una 'a' al final)
+ - Cambia solo en una letra (excepto si cambia en una 'a' al final):
   - Joan es Juan? ✓
   - Martines es Martinez? ✓
   - Ramon es Ramos? ✓
   - Juana es Juan? ✗
   - Antonio es Antonia? ✗
+  - Hernandez es Fernandez? ✗ (excepción)
 
 ##### Coincidencia por fila
 Para comprobar si una fila coincide, se comprueba nombre, apellido 1, apellido 2, nombre padre y nombre madre. Se usa la comprobacion por celda descrita en la sección anterior.
 
-En el caso de que solo uno de los campos esté vacío, también se considerará válido, aunque se priorizará aquellos resultados donde coinciden todos los campos.
+El programa tolera un máximo de 2 campos vacios, ya sea en el Excel o en la información de la persona que se busca. No obstante, se priorizan aquellos resultados donde coinciden más campos.
 
 
 ### Limpieza
@@ -88,6 +90,7 @@ Apellidos como "de la Cuesta" son problemáticos ya que a veces se puede referir
  - Tildes
  - Signos de interrogacion
  - Parentesis
+ - Puntos
 
 #### Natural/es de
 A menudo la casilla de abuelos incluye la procedencia, esto requiere detectarlo para no confundirlo con los apellidos:

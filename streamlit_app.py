@@ -8,33 +8,28 @@ st.set_page_config(layout="wide")
 # Show title and description.
 st.title("(GenReMur) Buscador Recursivo de antepasados Murcia")
 st.markdown("""
-            Descarga el archivos Excel del pueblo que te interese [aquí](https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469). 
-            Confirma que está en el Excel la persona cuyos ancestros quieres buscar. A continuación sube el Excel a esta web e introduce los datos de dicha persona. 
-            La aplicación buscará los datos de sus padres, abuelos, bisabuelos, etc. 
-            La documentación del programa está disponible [aquí](https://github.com/strukovas/genremur#GenReMur).  \n
+            Descarga el archivo Excel del pueblo que te interese [aquí](https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469). 
+            Confirma que está en el Excel la persona cuyos ancestros quieres buscar. A continuación sube el Excel a esta web e introduce los datos de dicha persona (mínimo 3 campos). 
+            El programa buscará los datos de sus padres, abuelos, bisabuelos, etc.  \n
+            La documentación del programa está disponible [aquí](https://github.com/strukovas/genremur#GenReMur). Consúltala ante cualquier duda. \n
             ¿Te interesa simplemente ver un ejemplo? Busca en Abarán a Aurelio Castaño Molina (padres Antonio y Trinidad).
             """
 )
 
 
-def set_key(k, v):
-    st.session_state[k] = v
-
-
 @st.fragment
-def bar():
+def upload_widget():
     # Let the user upload a file via `st.file_uploader`.
-    uploaded_file = st.file_uploader(
-        "", type=("xlsx"),
-        help="Algunos tips"
+    uploaded_file = st.file_uploader("", type=("xlsx"),
+        help="Sube aquí el archivo Excel. El concimiento del programa está limitado a este archivo."
     )
 
     if uploaded_file:
-        with st.spinner('(1) Cargando Excel, limpiando datos, marcando datos ausentes, estandarizando nombres...'):
+        with st.spinner('(1) Cargando Excel, limpiando datos, marcando celdas ausentes, estandarizando nombres...'):
             baut_all, matr_all, defu_all = lib.load_all_sheets_in_colab(
                 uploaded_file.read())
 
-        with st.spinner('(2) Separando nombre y apellidos, agrupando datos por año... '):
+        with st.spinner('(2) Separando nombre y apellidos, agrupando datos por año...'):
             from collections import defaultdict
             defu_by_year: dict[int, list] = defaultdict(list)
             for year, group in defu_all.groupby('Año'):
@@ -51,7 +46,7 @@ def bar():
                 'records') for year, group in matr_all.groupby('Año')}
             sheets = lib.Sheets(
                 baut_by_year=baut_by_year, matr_by_year=matr_by_year, defu_by_year=defu_by_year)
-            set_key("sheets", sheets)
+            st.session_state["sheets"] = sheets
 
             year_baut = ", ".join(
                 lib.get_year_ranges(list(baut_by_year.keys())))
@@ -60,11 +55,11 @@ def bar():
             year_defu = ", ".join(
                 lib.get_year_ranges(list(defu_by_year.keys())))
             st.markdown(
-                f"Excel procesado con éxito. Encontrado:  \n{len(baut_all)} Bautizos ({year_baut})  \n{len(matr_all)} Matrimonios ({year_matr})  \n{len(defu_all)} Defunciones ({year_defu})")
+                f"Excel procesado con éxito. Contiene los siguientes registros:  \n{len(baut_all)} Bautizos (Años: {year_baut})  \n{len(matr_all)} Matrimonios (Años: {year_matr})  \n{len(defu_all)} Defunciones (Años: {year_defu})")
 
 
 @st.fragment
-def foo():
+def person_form():
     with st.form(key='columns_in_form', enter_to_submit=False):
         col1, col2, col3 = st.columns(3)
         with col1:
@@ -100,7 +95,7 @@ def foo():
                 error += "Campo 'Nombre Madre' vacío.  \n"
                 n_missing += 1
             if n_missing > 2:
-                error += "**No puede haber más de 2 campos vacío**. Intenta rellenarlos todos.  \n"
+                error += "**No puede haber más de 2 campos vacíos**. Intenta rellenarlos todos.  \n"
                 st.markdown(error)
             else:
                 nombre = (nombre_val if nombre_val else "_")
@@ -128,56 +123,11 @@ def foo():
                 "**Antes de continuar debes subir un Excel en el que buscar**.")
 
 
-bar()
-foo()
-
-st.markdown(
-    """
-        <style>
-        .stAppHeader {
-        display:None} 
-        .stMainBlockContainer {
-               padding-top: 2rem;
-               padding-left:0rem;
-               padding-right:0rem;
-               padding-bottom:0rem;
-            }
-        .stMarkdown p {
-        padding-right:2em;
-        margin-bottom:0.2em;
-        }
-        [data-testid="stTextInputRootElement"] {
-          width:90%;
-        }
-        [data-testid="stFormSubmitButton"] {
-          width:90% !important;
-        }
-      
-        .stElementContainer {
-               padding-left:2rem;
-               padding-right:2em;
-        }
-        .stElementContainer:has(> .stIFrame) {
-        padding-left:0rem !important;
-               padding-right:0.1rem !important;
-        }
+upload_widget()
+person_form()
 
 
-[data-testid="stFileUploaderDropzone"] div div::before {
-content:"Sube un Excel de indexaciones"}
-[data-testid="stFileUploaderDropzone"] div div span {
-display:none;}
+with open('./files/styles.css') as f:
+    css = f.read()
 
-[data-testid="stFileUploader"]>section[data-testid="stFileUploaderDropzone"]>button[data-testid="stBaseButton-secondary"] {
-       color: rgba(0, 0, 0, 0);
-    }
-    [data-testid="stFileUploader"]>section[data-testid="stFileUploaderDropzone"]>button[data-testid="stBaseButton-secondary"]::after {
-        content: "Subir";
-        color:green;
-        display: block;
-        position: absolute;
-    }
-[data-testid="stFileUploaderDropzone"] div div::after { font-size: .8em; content:"Límite 200MB"}
-[data-testid="stFileUploaderDropzone"] div div small{display:none;}
-</style>
-""", unsafe_allow_html=True)
+st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)

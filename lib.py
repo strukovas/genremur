@@ -52,6 +52,8 @@ class Logger:
     self.context+= str(s)+"<br>"
 
   def log_flush(self):
+    if not self.context:
+      return
     context_map[self.id].append(self.context)
     self.context = ""
     print()
@@ -807,42 +809,40 @@ class Gen:
     # uses the first sibling TODO:Make it smarter, e.g. choose one with grandparents cells
     baut_ref = baut
     inferred_from_siblings = False
-    if not baut_ref:
-      if siblings and _INFER_PARENTS_FROM_SIBLINGS:
-        # Group potential siblings based on grandparents to avoid people with
-        # same parents but different grandparents.
-        # TODO: Make use of this information
-        sets_of_abuelos = get_sets_abuelos(siblings)
-        logger.log_accum(f"Hermanos potenciales")
-        for s in siblings:
-          logger.log_accum(f" → {s}")
-        if len(sets_of_abuelos.keys()) == 1:
+
+    if siblings:
+      logger.log_accum(f"Hermanos potenciales:")
+      for s in siblings:
+        logger.log_accum(f" → {s}")
+
+    if not baut_ref and siblings and _INFER_PARENTS_FROM_SIBLINGS:
+      sets_of_abuelos = get_sets_abuelos(siblings)
+      if len(sets_of_abuelos.keys()) == 1:
+        baut_ref = siblings[0]
+        inferred_from_siblings = True
+        logger.log_accum(f"Deducido datos de potencial hermano: {baut_ref.nombre}.")
+      else:
+        list_abuelos = sorted(sets_of_abuelos.items(),key=lambda x:x[0])
+        primeros_abuelos = list_abuelos[0][0]
+        abuelos_names = set(str(i) + x for i,x in enumerate(primeros_abuelos.split("|")))
+        same_abuelos = True
+        for s,_ in list_abuelos[1:]:
+          new_names = [str(i) + x for i,x in enumerate(s.split("|"))]
+          n_match = len(abuelos_names.intersection(new_names))
+          if n_match < 3:
+            same_abuelos = False
+            break
+
+        if not same_abuelos:
+          logger.log_accum(f"No se pueden deducir datos de los hermanos pues no todos los hermanos tienen los mismos abuelos.")
+        else:
           baut_ref = siblings[0]
           inferred_from_siblings = True
-          logger.log_accum(f"Deducido datos de hermano: {baut_ref.nombre}")
-          logger.log_accum("Todos los hermanos tienen los mismos padres y abuelos")
-        else:
-          list_abuelos = sorted(sets_of_abuelos.items(),key=lambda x:x[0])
-          primeros_abuelos = list_abuelos[0][0]
-          abuelos_names = set(str(i) + x for i,x in enumerate(primeros_abuelos.split("|")))
-          same_abuelos = True
-          for s,_ in list_abuelos[1:]:
-            new_names = [str(i) + x for i,x in enumerate(s.split("|"))]
-            n_match = len(abuelos_names.intersection(new_names))
-            if n_match < 3:
-              same_abuelos = False
-              break
-
-          if not same_abuelos:
-            logger.log_accum(f"No se pueden deducir datos de los hermanos pues no todos los hermanos tienen los mismos abuelos.")
-          else:
-            baut_ref = siblings[0]
-            inferred_from_siblings = True
-            logger.log_accum(f"Deducido datos de hermano: {baut_ref}")
-            logger.log_accum("Los abuelos de los hermanos difieren solo en un nombre")
-          for s,n in list_abuelos:
-            logger.log_accum(str(n)+"  "+str(s))
-        logger.log_flush()
+          logger.log_accum(f"Deducido datos de potentical hermano: {baut_ref}.")
+          logger.log_accum("Los abuelos de los hermanos difieren solo en un nombre.")
+        for s,n in list_abuelos:
+          logger.log_accum(str(n)+"  "+str(s))
+    logger.log_flush()
 
 
     r = baut_ref or defuncion
@@ -857,7 +857,7 @@ class Gen:
       zmadre = replace(r.madre, apellido_1=r.madre.apellido_1 or info.apellido_2)
     else:
       zmadre = FullName(info.nombre_madre, info.apellido_2)
-    
+
     # If we don't find anyhting better we just keep this
     padre = get_tree_parent_limited(zpadre)
     madre = get_tree_parent_limited(zmadre)
@@ -880,12 +880,13 @@ class Gen:
     if len(matrs) == 1:
       matr = matrs[0]
       if has_paternos or has_maternos: #No necesitamos inferir nada, solo informacion
-        logger.log_accum(f"Encontrado matrimonio de los padres.")
+        logger.log_accum(f"Encontrado matrimonio de los padres:")
+        logger.log_accum(matr)
       elif not (matr["Padres_Ella"] or type(matr["Padres_Ella"]) is not float):
-        logger.log_accum(f"Encontrado matrimonio de los padres pero NO aparecen los abuelos..")
+        logger.log_accum(f"Encontrado matrimonio de los padres pero NO aparecen los abuelos:")
         logger.log_accum(matr)
       else:
-        logger.log_accum(f"Encontrado matrimonio de los padres. Deducido los abuelos.")
+        logger.log_accum(f"Encontrado matrimonio de los padres. Deducido los abuelos:")
         logger.log_accum(matr)
         abuelos_paternos = matr["Padres_El"]
         abuelos_maternos = matr["Padres_Ella"]
@@ -896,7 +897,7 @@ class Gen:
           materno,materna = maternos
           madre = self.get_tree_parent_from_baut_v2(materno,materna, apellido_2, zmadre, year_birth)
     elif len(matrs) > 1:
-      logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno.")
+      logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno:")
       for m in matrs:
         logger.log_accum(f" → {m}")
     elif not has_maternos or not has_maternos:
@@ -908,13 +909,9 @@ class Gen:
 
     logger.log_flush()
 
-    #if not baut_ref and not defuncion:
-    #  return get_dummy_tree(info)
-
     # To log the name of the person in the tree
     if not baut:
       baut = get_dummy_tree(info).baut
-
 
     return Tree(id=id,baut=baut, defu=defuncion, padre= padre, madre= madre, n_siblings=n_siblings, inferred_from_siblings=inferred_from_siblings)
 
@@ -1005,9 +1002,9 @@ def get_tree_html(d: Tree, level: int = 0, is_last: bool = False, padding=""):
     n_siblings = f" [!{d.n_siblings}] "
 
   if context_map[d.id]:
-    s = f"{padding}{arrow}<span id='{d.id}' onclick='show_context(\"{d.id}\")' style='cursor:pointer'><b>{full_name}</b></span>{years}{n_siblings}<br>"
+    s = f"<span id='person_{d.id}' class='person' onclick='show_context(\"{d.id}\")' style='cursor:pointer'>{padding}{arrow}<b>{full_name}</b>{years}{n_siblings}</span><br>"
   else:
-    s = f"{padding}{arrow}<span id='{d.id}' onclick='show_context(\"{d.id}\")'>{full_name}</span>{years}{n_siblings}<br>"
+    s = f"<span id='person_{d.id}' class='person' onclick='show_context(\"{d.id}\")'>{padding}{arrow}{full_name}{years}{n_siblings}</span><br>"
   #output += s
 
   if level:
@@ -1020,62 +1017,86 @@ def get_tree_html(d: Tree, level: int = 0, is_last: bool = False, padding=""):
   return s + p1 + p2
 
 def get_webpage(tree):
-  output = get_tree_html(tree)
-  context_html = ""
-  for id, l in context_map.items():
-      context_person = f"<div id='context_{id}' style='display:none'>"
-      for s in l:
-          context_person += f"{s}<br>"
-      context_person += f"</div>"
-      context_html += f"{context_person}"
-
-  c = """
-  <html>
-  <meta charset="UTF-8">
-  <script>
-  function show_context(id) {
-  var z =  document.getElementById("context_"+id).innerHTML;
-  document.getElementById("context").innerHTML =z;
-  }
-  </script>
-
-  <div id="context" style="border: solid 1px; font-family:'Open Sans', sans-serif; height:25vh;position: fixed; top: 0; left: 0; right: 0; width: 100%; max-height: 25vh; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border-bottom: 1px solid #ccc; box-sizing: border-box; z-index: 1000;">
-  ...
-  </div>
-  <div id="tree" style="font-family: Consolas, 'Courier New', monospace;padding-top: 25vh">
-
-  """
-  c += f"""
-  {output}
-  </div>
-  <hr>
-
-  {context_html}
-  """
-  c += """
-  <script>
-  function redirectToTree() {
-  const tree = document.getElementById("tree");
-
-  // Scroll into view smoothly
-  tree.scrollIntoView({ behavior: "smooth", block: "start" });
-
-  // Update the URL hash
-  window.location.hash = "tree";
-  }
-  redirectToTree();
-  </script>
-  </html>
-  """
-  return c
+    output = get_tree_html(tree)
+    context_html = ""
+    for id, l in context_map.items():
+        context_person = f"<div id='context_{id}' style='display:none'>"
+        for s in l:
+            context_person += f"{s}<br>"
+        context_person += f"</div>"
+        context_html += f"{context_person}"
+    
+    c = """
+    <html>
+    <meta charset="UTF-8">
+    <style>
+    .highlighted {
+        background-color: #afddf9;
+        padding: 2px;
+        padding-left: 0px;
+        border-radius: 3px;
+        transition: background-color 0.3s ease;
+    }
+    </style>
+    <script>
+    let currentHighlightedId = null;
+    
+    function show_context(id) {
+        // Update context
+        var z = document.getElementById("context_"+id).innerHTML;
+        document.getElementById("context").innerHTML = z;
+        
+        // Remove previous highlight
+        if (currentHighlightedId) {
+            const prevElement = document.getElementById("person_"+currentHighlightedId);
+            if (prevElement) {
+                prevElement.classList.remove('highlighted');
+            }
+        }
+        
+        // Add new highlight
+        const newElement = document.getElementById("person_"+id);
+        if (newElement) {
+            newElement.classList.add('highlighted');
+        }
+        
+        // Update current highlighted ID
+        currentHighlightedId = id;
+    }
+    </script>
+    <div id="context" style="border: solid 1px; font-family:'Open Sans', sans-serif; height:25vh;position: fixed; top: 0; left: 0; right: 0; width: 100%; max-height: 25vh; overflow-y: auto; background-color: #f9f9f9; padding: 10px; border-bottom: 1px solid #ccc; box-sizing: border-box; z-index: 1000;">
+    ...
+    </div>
+    <div id="tree" style="font-family: Consolas, 'Courier New', monospace;padding-top: 25vh">
+    """
+    c += f"""
+    {output}
+    </div>
+    <hr>
+    {context_html}
+    """
+    c += """
+    <script>
+    function redirectToTree() {
+        const tree = document.getElementById("tree");
+        // Scroll into view smoothly
+        tree.scrollIntoView({ behavior: "smooth", block: "start" });
+        // Update the URL hash
+        window.location.hash = "tree";
+    }
+    redirectToTree();
+    </script>
+    </html>
+    """
+    return c
 
 def get_year_ranges(nums) -> []:
   if not nums:
       return []
-  
+
   ranges = []
   start = nums[0]
-  
+
   for i in range(1, len(nums)):
       if nums[i] != nums[i - 1] + 1:  # Check if the current number is not consecutive
           end = nums[i - 1]
@@ -1084,11 +1105,11 @@ def get_year_ranges(nums) -> []:
           else:
               ranges.append(f"{start}-{end}")  # Range from start to end
           start = nums[i]
-  
+
   # Add the last range
   if start == nums[-1]:
       ranges.append(str(start))
   else:
       ranges.append(f"{start}-{nums[-1]}")
-  
+
   return ranges

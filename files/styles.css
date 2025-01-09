@@ -1,0 +1,62 @@
+.stAppHeader {
+    display: None
+}
+
+.stMainBlockContainer {
+    padding-top: 2rem;
+    padding-left: 0rem;
+    padding-right: 0rem;
+    padding-bottom: 0rem;
+}
+
+.stMarkdown p {
+    padding-right: 2em;
+    margin-bottom: 0.2em;
+}
+
+[data-testid="stTextInputRootElement"] {
+    width: 90%;
+}
+
+[data-testid="stFormSubmitButton"] {
+    width: 90% !important;
+}
+
+.stElementContainer {
+    padding-left: 2rem;
+    padding-right: 2em;
+}
+
+.stElementContainer:has(> .stIFrame) {
+    padding-left: 0rem !important;
+    padding-right: 0.1rem !important;
+}
+
+
+[data-testid="stFileUploaderDropzone"] div div::before {
+    content: "Sube un Excel de indexaciones"
+}
+
+[data-testid="stFileUploaderDropzone"] div div span {
+    display: none;
+}
+
+[data-testid="stFileUploader"]>section[data-testid="stFileUploaderDropzone"]>button[data-testid="stBaseButton-secondary"] {
+    color: rgba(0, 0, 0, 0);
+}
+
+[data-testid="stFileUploader"]>section[data-testid="stFileUploaderDropzone"]>button[data-testid="stBaseButton-secondary"]::after {
+    content: "Subir";
+    color: green;
+    display: block;
+    position: absolute;
+}
+
+[data-testid="stFileUploaderDropzone"] div div::after {
+    font-size: .8em;
+    content: "Límite 200MB"
+}
+
+[data-testid="stFileUploaderDropzone"] div div small {
+    display: none;
+}
