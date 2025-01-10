@@ -218,13 +218,16 @@ def clean_column_name(name):
 WOMEN_NAME_FOLLOWUPS = set([
     "Ana",
     "Angeles",
+    "Angustias",
     "Antonia",
+    "Micaela",
     "Ascension",
     "Bienvenida",
     "Carmen",
     "Casimira",
     "Catalina",
     "Cayetana",
+    "Concepcion",
     "Dolores",
     "Elisa",
     "Encarnacion",
@@ -238,8 +241,10 @@ WOMEN_NAME_FOLLOWUPS = set([
     "Juana",
     "Luisa",
     "Mercedes",
+    "Magdalena",
     "Pascual",
     "Pascuala",
+    "Patrocinio", # Maria Patrocinio
     "Pilar",
     "Purificacion",
     "Remedios",
@@ -272,6 +277,7 @@ NAME_FOLLOWUPS = set([
     "Lazaro",
     "Luis",
     "Manuel",
+    "Miguel",
     "Maria",
     "Pablo",
     "Pascual",
@@ -399,13 +405,12 @@ def match_cell(cell: str, candidate: str):
     return Match.MISSING_INFO
 
   starts_with_candidate = re.match(pattern=f"^{re.escape(candidate)}\\b",string=cell)
-  starts_with_maria_candidate =  re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell)
-  #TODO
-  starts_with_maria_cell =  re.match(pattern=f"^Maria {re.escape(cell)}\\b",string=candidate)
   if starts_with_candidate:
     return Match.TOTAL
-  elif (candidate in WOMEN_NAME_FOLLOWUPS and starts_with_maria_candidate) or (cell in WOMEN_NAME_FOLLOWUPS and starts_with_maria_cell):
+  elif candidate in WOMEN_NAME_FOLLOWUPS and re.match(pattern=f"^{re.escape(candidate)}\\b",string=cell):
       return Match.TOTAL
+  elif cell in WOMEN_NAME_FOLLOWUPS and re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell):
+    return Match.TOTAL
   # Si difiere en un solo caracter (mismas posiciones) lo damos por bueno
   elif r:=startswith_differ_by_one_char(cell, candidate):
     return r
@@ -638,6 +643,12 @@ class SearchInfo:
     madre = self.nombre_madre if self.nombre_madre else "_"
     apellido_2 = self.apellido_2 if self.apellido_2 else "_"
     return f"{self.nombre} {self.apellido_1} {apellido_2} ({padre} & {madre})"
+
+  def str_explicit(self):
+    padre = self.nombre_padre if self.nombre_padre else "_"
+    madre = self.nombre_madre if self.nombre_madre else "_"
+    apellido_2 = self.apellido_2 if self.apellido_2 else "_"
+    return f"{self.nombre} | {self.apellido_1} | {apellido_2} ({padre} & {madre})"
 
 
 @dataclass
