@@ -380,7 +380,7 @@ def print_row(r):
     log(f"({nombre} {apellido_1} {apellido_2}) Padres:({padre} \ {madre}) (-{year}) {obs}")
 
 def replace_none(v,s):
-  if v is None:
+  if not v:
     return s
   return v
 
@@ -391,14 +391,17 @@ class FullName:
   apellido_2: str | None = None
   origen: str | None = None # Sin usar de momento
 
+  def __post_init__(self):
+    if not self.nombre:
+      pass
+      #print(f"Unexpected error, there shouldn't be a FullName object without name: {self.str_explicit()}")
+
   def __str__(self):
     apellido_1 = replace_none(self.apellido_1, "")
     apellido_2 = replace_none(self.apellido_2, "")
     nombre = replace_none(self.nombre, "_")
     origen = f" (de {self.origen})" if self.origen else ""
     s =  " ".join(x for x in [nombre, apellido_1, apellido_2,origen] if x)
-    if not self.nombre:
-      raise ValueError(f"Unexpected error, there shouldn't be a FullName object without name: {s}")
     return s
 
   def str_explicit(self):
