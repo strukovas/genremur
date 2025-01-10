@@ -89,38 +89,39 @@ import functools
 @functools.cache
 def compute_rewrite_rules():
   _REWRITE_RULES = [
-      (["Gimenez","Ximenez"], "Jimenez"),
-      (["Salbador"], "Salvador"),
-      (["Salbadora"], "Salvadora"),
-      (["Ysabel","Ysavel","Isavel"], "Isabel"),
-      (["Joachina"], "Joaquina"),
-      (["Joquin","Joachin"], "Joaquin"),
-      (["Josepha"], "Josefa"),
-      (["Joseph","Josef"], "Jose"),
+      (["Anna"],"Ana"),
+      (["Aº"],"Antonio"),
+      (["Baquero","Baquelo","Vaquelo"],"Vaquero"),
       (["Bartholome"], "Bartolome"),
       (["Cathalina"], "Catalina"),
-      (["Thomas"], "Tomas"),
-      (["Matheo"],"Mateo"),
+      (["Covarro"], "Cobarro"),
+      (["Estevan"], "Esteban"),
+      (["Gimenez","Ximenez"], "Jimenez"),
+      (["Hoios", "Oios", "Hoyos"], "Oyos"),
       (["Jines"], "Gines"),
-      (["Ysidra"], "Isidra"),
+      (["Joachina"], "Joaquina"),
+      (["Joquin","Joachin"], "Joaquin"),
+      (["Joseph","Josef"], "Jose"),
+      (["Josepha"], "Josefa"),
+      (["Matheo"],"Mateo"),
+      (["Maxima"], "Maximina"),
+      (["Mª"],"Maria"),
       (["Pasqual"], "Pascual"),
       (["Pasquala"], "Pascuala"),
-      (["Covarro"], "Cobarro"),
-      (["Maxima"], "Maximina"),
-      (["Quadrado"], "Cuadrado"),
-      (["Hoios", "Oios", "Hoyos"], "Oyos"),
       (["Penalba"],"Penalva"),
+      (["Quadrado"], "Cuadrado"),
+      (["Salbador"], "Salvador"),
+      (["Salbadora"], "Salvadora"),
+      (["Thomas"], "Tomas"),
+      (["Xaime"],"Jaime"),
+      (["Xavier"],"Javier"),
+      (["Ygnacia"],"Ignacia"),
+      (["Ygnacio"],"Ignacio"),
+      (["Ysabel","Ysavel","Isavel"], "Isabel"),
+      (["Ysidra"], "Isidra"),
       (["No constan", "n/c","nc"],""),
       (["x", "xx","xxx","xxxx"],""),
       (["…","……","………","…………"], ""),
-      (["Anna"],"Ana"),
-      (["Baquero","Baquelo","Vaquelo"],"Vaquero"),
-      (["Xaime"],"Jaime"),
-      (["Xavier"],"Javier"),
-      (["Aº"],"Antonio"),
-      (["Mª"],"Maria"),
-      (["Ygnacio"],"Ignacio"),
-      (["Ygnacia"],"Ignacia"),
   ]
   compiled_rules = []
   for patterns, replacement in _REWRITE_RULES:
@@ -214,23 +215,69 @@ def clean_column_name(name):
 ########################
 
 # TODO: Pascual suele ser apellido, Vicente a veces
-NAME_FOLLOWUPS = set([
-    "Jesus", "Dolores", "Maria", "Encarnacion", "Jose", "Antonio", "Ana",
-    "Rosa", "Carmen", "Josefa", "Pablo", "Antonia", "Angeles", "Rosario",
-    "Trinidad", "Pedro", "Juana", "Francisca", "Visitacion", "Dios", "Alejandro",
-    "Elisa", "Angel","Casimiro","Casimira", "Pascual", "Pascuala", "Cruz", "Catalina",
-    "Bautista", "Fermina", "Joaquin", "Joaquina","Biviano", "Lazaro",
-    "Luis", "Juan", "Amador", "Luisa", "dJorge", "Vicente","Vicenta",
-    "Isabel","Javier", "Cayetano", "Cayetana", "Rodrigo"
+WOMEN_NAME_FOLLOWUPS = set([
+    "Ana",
+    "Angeles",
+    "Antonia",
+    "Carmen",
+    "Casimira",
+    "Catalina",
+    "Cayetana",
+    "Dolores",
+    "Elisa",
+    "Encarnacion",
+    "Fermina",
+    "Francisca",
+    "Gracia",
+    "Ignacia",
+    "Isabel",
+    "Joaquina",
+    "Josefa",
+    "Juana",
+    "Luisa",
+    "Mercedes",
+    "Pascual",
+    "Pascuala",
+    "Pilar",
+    "Purificacion",
+    "Remedios",
+    "Rosa",
+    "Rosario",
+    "Teresa",
+    "Trinidad",
+    "Vicenta",
+    "Visitacion",
 ])
 
-MARIA_FOLLOWUPS = set([
- "Dolores",  "Encarnacion", "Ana",
-    "Rosa", "Carmen", "Josefa", "Antonia", "Angeles", "Rosario",
-    "Trinidad", "Juana", "Francisca", "Visitacion", "Catalina",
- "Pascuala", "Fermina", "Joaquina", "Pascual", "Purificacion", "Luisa",
- "Isabel","Ignacia","Vicenta"
-])
+NAME_FOLLOWUPS = set([
+    "Alejandro",
+    "Amador",
+    "Angel",
+    "Antonio",
+    "Bautista",
+    "Biviano",
+    "Casimiro",
+    "Cayetano",
+    "Cruz",
+    "Diego",
+    "Dios",
+    "Javier",
+    "Jesus",
+    "Joaquin",
+    "Jorge",
+    "Jose",
+    "Juan",
+    "Lazaro",
+    "Luis",
+    "Manuel",
+    "Maria",
+    "Pablo",
+    "Pascual",
+    "Pedro",
+    "Rodrigo"
+    "Vicente",
+]).union(WOMEN_NAME_FOLLOWUPS)
+
 
 def split_name_surnames(s: str):
   splits = re.split(r' ', s, flags=re.IGNORECASE)
@@ -311,7 +358,7 @@ def missing_one_char(str1, str2):
 
 
 def startswith_differ_by_one_char(cell, candidate):
-  # If there is more than a 1 char len diff try to split cell in case it has 
+  # If there is more than a 1 char len diff try to split cell in case it has
   # several nouns
   if abs(len(cell) - len(candidate)) > 1:
     cell = cell.split(" ")[0]
@@ -351,7 +398,7 @@ def match_cell(cell: str, candidate: str):
   starts_with_maria_candidate =  re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell)
   if starts_with_candidate:
     return Match.TOTAL
-  elif candidate in MARIA_FOLLOWUPS and starts_with_maria_candidate:
+  elif candidate in WOMEN_NAME_FOLLOWUPS and starts_with_maria_candidate:
       return Match.TOTAL
   # Si difiere en un solo caracter (mismas posiciones) lo damos por bueno
   elif r:=startswith_differ_by_one_char(cell, candidate):
@@ -771,10 +818,10 @@ class Gen:
     return Findings(full_matches, partial_matches, broad_matches)
 
 
-  def get_tree_parent_from_baut_v2(self, abuelo: FullName, abuela: FullName, apellido_parent: str, parent: FullName, year:int):
+  def get_tree_parent_from_baut_v2(self, abuelo: FullName, abuela: FullName,parent: FullName, year:int):
     padre_info = SearchInfo(
         nombre=parent.nombre,
-        apellido_1=parent.apellido_1 or abuelo.apellido_1 or apellido_parent,
+        apellido_1=parent.apellido_1 or abuelo.apellido_1,
         apellido_2=parent.apellido_2 or abuela.apellido_1,
         nombre_padre=abuelo.nombre,
         nombre_madre=abuela.nombre,
@@ -855,13 +902,13 @@ class Gen:
     apellido_2 = r.apellido_2 if r and r.apellido_2 else info.apellido_2
     year_birth = baut_ref.year if baut_ref else None
     if r and r.padre:
-      zpadre = replace(r.padre, apellido_1=r.padre.apellido_1 or info.apellido_1)
+      zpadre = replace(r.padre, apellido_1=r.padre.apellido_1 or apellido_1)
     else:
-      zpadre = FullName(info.nombre_padre, info.apellido_1)
+      zpadre = FullName(info.nombre_padre, apellido_1)
     if r and r.madre:
-      zmadre = replace(r.madre, apellido_1=r.madre.apellido_1 or info.apellido_2)
+      zmadre = replace(r.madre, apellido_1=r.madre.apellido_1 or apellido_2)
     else:
-      zmadre = FullName(info.nombre_madre, info.apellido_2)
+      zmadre = FullName(info.nombre_madre, apellido_2)
 
     # If we don't find anyhting better we just keep this
     padre = get_tree_parent_limited(zpadre)
@@ -872,10 +919,10 @@ class Gen:
     has_paternos = baut_ref and baut_ref.paterno and baut_ref.paterna
     # TODO: Clarify the whole float.nan, "nan", "Missing" situation to make it clear
     if has_paternos:
-      padre = self.get_tree_parent_from_baut_v2(baut_ref.paterno, baut_ref.paterna, baut_ref.apellido_1, baut_ref.padre, year_birth)
+      padre = self.get_tree_parent_from_baut_v2(baut_ref.paterno, baut_ref.paterna, zpadre, year_birth)
 
     if has_maternos:
-      madre = self.get_tree_parent_from_baut_v2(baut_ref.materno, baut_ref.materna, baut_ref.apellido_2, baut_ref.madre, year_birth)
+      madre = self.get_tree_parent_from_baut_v2(baut_ref.materno, baut_ref.materna, zmadre, year_birth)
 
     #if not baut_ref or not baut_ref.padre or not baut_ref.madre or not has_maternos or not has_paternos:
     # Try to find abuelos from marrage of parents
@@ -884,6 +931,8 @@ class Gen:
     matrs = matrs_fin.full_matches or matrs_fin.partial_matches
     if len(matrs) == 1:
       matr = matrs[0]
+      # TODO: Make it work so that if if only one is missing (paternos or maternos)
+      # it stills helps to infer
       if has_paternos or has_maternos: #No necesitamos inferir nada, solo informacion
         logger.log_accum(f"Encontrado matrimonio de los padres:")
         logger.log_accum(matr)
@@ -894,13 +943,18 @@ class Gen:
         logger.log_accum(f"Encontrado matrimonio de los padres. Deducido los abuelos:")
         logger.log_accum(matr)
         abuelos_paternos = matr["Padres_El"]
-        abuelos_maternos = matr["Padres_Ella"]
         if paternos := get_abuelos(abuelos_paternos):
           paterno,paterna = paternos
-          padre = self.get_tree_parent_from_baut_v2(paterno,paterna,apellido_1, zpadre, year_birth)
+          if not zpadre.apellido_2:
+            zpadre.apellido_1 = zpadre.apellido_1 or matr["Apellido_1_El"]
+            zpadre.apellido_2 = zpadre.apellido_2 or matr["Apellido_2_El"]
+          padre = self.get_tree_parent_from_baut_v2(paterno,paterna, zpadre, year_birth)
+        abuelos_maternos = matr["Padres_Ella"]
         if maternos := get_abuelos(abuelos_maternos):
           materno,materna = maternos
-          madre = self.get_tree_parent_from_baut_v2(materno,materna, apellido_2, zmadre, year_birth)
+          zmadre.apellido_1 = zmadre.apellido_1 or matr["Apellido_1_Ella"]
+          zmadre.apellido_2 = zmadre.apellido_2 or matr["Apellido_2_Ella"]
+          madre = self.get_tree_parent_from_baut_v2(materno,materna, zmadre, year_birth)
     elif len(matrs) > 1:
       logger.log_accum(f"Varios potenciales matrimonios de los padres encontrados. No se ha elegido ninguno:")
       for m in matrs:
@@ -1085,7 +1139,7 @@ def get_webpage(tree):
     function redirectToTree() {
         const tree = document.getElementById("tree");
         // Scroll into view smoothly
-        tree.scrollIntoView({ behavior: "smooth", block: "start" });
+        tree.scrollIntoView({ behavior: "instant", block: "start" });
         // Update the URL hash
         window.location.hash = "tree";
     }
