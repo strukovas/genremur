@@ -219,6 +219,8 @@ WOMEN_NAME_FOLLOWUPS = set([
     "Ana",
     "Angeles",
     "Antonia",
+    "Ascension",
+    "Bienvenida",
     "Carmen",
     "Casimira",
     "Catalina",
@@ -286,7 +288,8 @@ def split_name_surnames(s: str):
   # TODO: Hacer algo con esta informacion
   # Juan Perez Natural (de) Cieza
   for i,v in enumerate(splits):
-    if v == "Natural" or v== "Naturales":
+    # Evitar que splits=[] si la casilla empieza por Natural
+    if i > 0 and v == "Natural" or v== "Naturales":
       origen = " ".join(splits[i:])
       splits = splits[:i]
       break
@@ -300,9 +303,9 @@ def split_name_surnames(s: str):
   if len(splits) > 3:
     # Assume the 2 last are surnames and the rest the name
     # Doesn't work for sth like Juana Perez (de los) Cobos Martinez
-    z =  FullName(" ".join(splits[0:-2]), splits[-2], splits[-1])
+    z = FullName(" ".join(splits[0:-2]), splits[-2], splits[-1])
     # TODO:
-    log("Persona con >3 apellidos, no se puede procesar : "+str(z))
+    log("Persona con >3 palabras, no se ha podido separar bien nombres y apellidos : "+str(z))
     return z
   if len(splits) == 3:
     return FullName(splits[0], splits[1], splits[2], origen)
@@ -310,7 +313,8 @@ def split_name_surnames(s: str):
     return FullName(splits[0], splits[1], None, origen)
   if len(splits) == 1:
     return  FullName(splits[0], None, None, origen)
-  raise ValueError("Unexpected error")
+  print(f"Error inesperado al separar nombres y apellidos de '{s}' '{splits}'")
+  return FullName(s)
 
 def get_abuelos(s: str):
   separator = r"\s+[ye]\s+|\s*[/]\s*"
@@ -396,9 +400,11 @@ def match_cell(cell: str, candidate: str):
 
   starts_with_candidate = re.match(pattern=f"^{re.escape(candidate)}\\b",string=cell)
   starts_with_maria_candidate =  re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell)
+  #TODO
+  starts_with_maria_cell =  re.match(pattern=f"^Maria {re.escape(cell)}\\b",string=candidate)
   if starts_with_candidate:
     return Match.TOTAL
-  elif candidate in WOMEN_NAME_FOLLOWUPS and starts_with_maria_candidate:
+  elif (candidate in WOMEN_NAME_FOLLOWUPS and starts_with_maria_candidate) or (cell in WOMEN_NAME_FOLLOWUPS and starts_with_maria_cell):
       return Match.TOTAL
   # Si difiere en un solo caracter (mismas posiciones) lo damos por bueno
   elif r:=startswith_differ_by_one_char(cell, candidate):
