@@ -311,11 +311,13 @@ def missing_one_char(str1, str2):
 
 
 def startswith_differ_by_one_char(cell, candidate):
+  # If there is more than a 1 char len diff try to split cell in case it has 
+  # several nouns
+  if abs(len(cell) - len(candidate)) > 1:
+    cell = cell.split(" ")[0]
+
   if missing_one_char(cell, candidate):
     return Match.TOTAL
-
-  if len(cell) != len(candidate):
-    cell = cell.split(" ")[0]
 
   if len(cell) != len(candidate):
     return Match.NO
@@ -1025,27 +1027,27 @@ def get_webpage(tree):
             context_person += f"{s}<br>"
         context_person += f"</div>"
         context_html += f"{context_person}"
-    
+
     c = """
     <html>
     <meta charset="UTF-8">
     <style>
     .highlighted {
-        background-color: #afddf9;
+        background-color: #cbebff;
         padding: 2px;
         padding-left: 0px;
         border-radius: 3px;
-        transition: background-color 0.3s ease;
+        transition: background-color 0.8s ease;
     }
     </style>
     <script>
     let currentHighlightedId = null;
-    
+
     function show_context(id) {
         // Update context
         var z = document.getElementById("context_"+id).innerHTML;
         document.getElementById("context").innerHTML = z;
-        
+
         // Remove previous highlight
         if (currentHighlightedId) {
             const prevElement = document.getElementById("person_"+currentHighlightedId);
@@ -1053,13 +1055,13 @@ def get_webpage(tree):
                 prevElement.classList.remove('highlighted');
             }
         }
-        
+
         // Add new highlight
         const newElement = document.getElementById("person_"+id);
         if (newElement) {
             newElement.classList.add('highlighted');
         }
-        
+
         // Update current highlighted ID
         currentHighlightedId = id;
     }
