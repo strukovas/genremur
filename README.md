@@ -2,9 +2,7 @@
 
 https://genremur.streamlit.app/
 
-GenReMur es una aplicación experimental para obtener de forma automática información genealógica basada en los datos indexados por el grupo de voluntarios de [Indexación Murcia Genealogía](https://www.facebook.com/groups/Indexacion.Murcia.Genealogia/).
-
-Este grupo recopila principalmente partidas de bautismo, matrimonio y defunción de los pueblos de la Región de Murcia y lo vuelca en documentos de Excel. Estos documentos están disponibles en la [nube](https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469).
+GenReMur es una aplicación experimental para obtener de forma automática información genealógica basada en los datos indexados por el grupo de voluntarios de [Indexación Murcia Genealogía](https://www.facebook.com/groups/Indexacion.Murcia.Genealogia/). Este grupo recopila principalmente partidas de bautismo, matrimonio y defunción de los pueblos de la Región de Murcia y lo vuelca en documentos de Excel. Dichos documentos están disponibles en la [nube](https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469).
 
 La idea de GenReMur es aprovechar los datos de estos Excels para buscar automáticamente antepasados en base a los campos que especifican los padres y los abuelos. Principalmente, el programa buscará la persona indicada, sacará los padres y abuelos, y repetirá el proceso para cada padre. Por lo tanto, el programa solo funcionará en caso de que los padres y abuelos estén indicados en el Excel.
 
@@ -12,7 +10,7 @@ Antes de usar el programa lo primero es entender si el Excel que se utiliza cont
 
 ### Limitaciones
 #### Apellidos compuestos
-En los campos de padres y abuelos, el programa espera nombres de 3 palabras como máximo, o de 4 si la segunda palabra está ne la lista de nombres compuestos. Por lo tanto, no es capaz de detectar apellidos compuestos (excepto que estuvieran siempre unidos con un guion como Marin-Ordoñez).
+En los campos de padres y abuelos, el programa espera nombres de 3 palabras como máximo, o de 4 si la segunda palabra está en la lista de nombres compuestos. Por lo tanto, no es capaz de detectar apellidos compuestos (excepto que estuvieran siempre unidos con un guión como Marin-Ordoñez).
 
 #### Datos ausentes en Excel
 Aunque los padres o abuelos estén presentes en la imagen de FamilySearch, si estos no aparecen en sus columnas correspondientes en el Excel, el programa no los puede detectar. El programa no puede obtener está información del campo observaciones tampoco.
@@ -22,14 +20,14 @@ El programa es conservador y solo acepta coincidencias si las diferencias son pe
 
 
 ### Preguntas frequentes
-#### ¿Por qué a mi no me funciona?
+#### ¿Por qué a mí no me funciona?
 Pueden haber varios motivos por los que no funcione. En primer lugar, la persona que se busca debe aparece en el Excel (con padres y abuelos). En segundo lugar revisa la sección limitaciones para entender lo que puede y no puede hacer el programa. También ten en cuenta que la mayoría de Excels no estan 100% completos y faltan años.
 
 #### ¿Dónde descargo el Excel?
 https://onedrive.live.com/?authkey=%21AI%2DjU1MqxB9G8oM&id=BF237BB486352469%21510525&cid=BF237BB486352469
 
-#### ¿Como puedo hacer que funcione mejor el programa?
-Aunque el programa tiene mucho margen de mejora, al final es una lucha infinita contra los datos libremente escritos en el Excel. La mejor forma de conseguir que el programa funcione mejor es limpiando los datos del Excel. Pero si tienes
+#### ¿Cómo puedo hacer que funcione mejor el programa?
+Aunque el programa tiene mucho margen de mejora, al final es una lucha infinita contra los datos libremente escritos en el Excel. La mejor forma de conseguir que el programa funcione mejor es limpiando los datos del Excel.
 
 ### Detalles técnicos (funcionamiento)
 #### Lógica
@@ -39,9 +37,9 @@ La lógica del programa es la siguiente. Dada una persona (nombre, apellido 1, a
  3. Busca hermanos (alguien con mismos padres y mismos apellidos)
   3.1 Solo acepta hermanos si los abuelos de todos los candidatos coinciden
  4. Busca matrimonio de los padres
- 5. Si abuelos encontrado en bautizo o matrimonio repite la busqueda para el padre y la madre
+ 5. Si abuelos encontrado en bautizo o matrimonio repite la búsqueda para el padre y la madre
 
-#### Definicion de coincidencia
+#### Definición de coincidencia
 ##### Coincidencia por celda
 Se considera que el nombre o apellido que aparece en una celda coincide la palabra/s candidatas si:
  - Empieza por la misma palabra:
@@ -63,9 +61,9 @@ Se considera que el nombre o apellido que aparece en una celda coincide la palab
   - Hernandez es Fernandez? ✗ (excepción)
 
 ##### Coincidencia por fila
-Para comprobar si una fila coincide, se comprueba nombre, apellido 1, apellido 2, nombre padre y nombre madre. Se usa la comprobacion por celda descrita en la sección anterior.
+Para comprobar si una fila coincide, se comprueba nombre, apellido 1, apellido 2, nombre padre y nombre madre. Se usa la comprobación por celda descrita en la sección anterior.
 
-El programa tolera un máximo de 2 campos vacios, ya sea en el Excel o en la información de la persona que se busca. No obstante, se priorizan aquellos resultados donde coinciden más campos.
+El programa tolera un máximo de 2 campos vacíos, ya sea en el Excel o en la información de la persona que se busca. No obstante, se priorizan aquellos resultados donde coinciden más campos.
 
 
 ### Limpieza
@@ -79,16 +77,16 @@ El campo abuelos paternos/maternos puede estar separados de distintas formas:
  - Jose Sanchez Juana Perez (no soportado)
 
 #### D, Don, Doña, Dña, D, etc
-En ocasiones los nombres pueden incluir una mención a que la persona era Don Juan Perez, por lo que hay que detectar varias formas como esto puede estar especificado y eliminar estos prefijos para el analisis.
+En ocasiones los nombres pueden incluir una mención a que la persona era Don Juan Perez, por lo que hay que detectar varias formas como esto puede estar especificado y eliminar estos prefijos para el análisis.
 
 #### De, de la, del, de los, de las, etc.
-Apellidos como "de la Cuesta" son problemáticos ya que a veces se puede referir a ellos sin los articulos. Por lo tanto, estos se eliminan a la hora de analizar:
+Apellidos como "de la Cuesta" son problemáticos ya que a veces se puede referir a ellos sin los artículos. Por lo tanto, estos se eliminan a la hora de analizar:
  - Juan de la Cuesta Martinez -> Juan Cuesta Martinez
  - Maria de los Dolores -> Maria Dolores
 
 #### Eliminaciones varias
  - Tildes
- - Signos de interrogacion
+ - Signos de interrogación
  - Parentesis
  - Puntos
 
@@ -130,9 +128,9 @@ A menudo la casilla de abuelos incluye la procedencia, esto requiere detectarlo 
   - "No constan", "n/c","nc" -> ""
 
 ## Separación de nombres y apellidos
-El segundo reto para el programa es determinar dado un nombre completo, que parte es nombre, apellido 1 y apellido 2. Esto no suele ser problema para la persona principal pues tiene campos separados para nombre, apellido 1 y apellido 2, pero si es un problema con padres y abuelos. Por lo tanto la función de separación de nombres solo a los campos de padres y abuelos.
+El segundo reto para el programa es determinar dado un nombre completo, que parte es nombre, apellido 1 y apellido 2. Esto no suele ser problema para la persona principal pues tiene campos separados para nombre, apellido 1 y apellido 2, pero si es un problema con padres y abuelos. Por lo tanto la función de separación de nombres solo se aplica a los campos de padres y abuelos.
 
-En general, para cadenas de 3 palabras o menos, la logica es simplemente considerar la primera palabra nombre, y las siguientes apellidos. Por ejemplo:
+En general, para cadenas de 3 palabras o menos, la lógica es simplemente considerar la primera palabra nombre, y las siguientes apellidos. Por ejemplo:
 - Juan -> Juan | _ | _
 - Juan Perez -> Juan | Perez | _
 - Juan Perez Sanchez -> Juan | Perez | Sanchez
