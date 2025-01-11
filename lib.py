@@ -8,7 +8,7 @@ from typing import Tuple
 
 
 # Wheter to print logs
-_LOGGING = True
+_LOGGING = False
 
 _VERIFY_SAME_SURNAMES_PER_ROW = False
 
@@ -44,23 +44,36 @@ class Logger:
     context_map[self.id].append(s+"<br>")
 
   def log_accum(self, s:str=""):
-    if _LOGGING:
-      if not self.context:
-        print(f"{self.nombre_completo} - {s}")
-      else:
-        print(f"{s}")
     self.context+= str(s)+"<br>"
 
   def log_flush(self):
     if not self.context:
       return
     context_map[self.id].append(self.context)
+    if _LOGGING:
+      print(f"{self.nombre_completo}:")
+      print(self.context.replace("<br>","\n"))
     self.context = ""
-    print()
 
 def log(s:str=""):
   if _LOGGING:
     print(s)
+
+
+def check_streamlit():
+  """
+  Function to check whether python code is run within streamlit
+
+  Returns
+  -------
+  use_streamlit : boolean
+      True if code is run within streamlit, else False
+  """
+  try:
+      from streamlit.script_run_context import get_script_run_ctx
+      return get_script_run_ctx() is not None
+  except ModuleNotFoundError:
+      return False
 
 def upload_file():
   from google.colab import files
@@ -86,130 +99,166 @@ def extract_year(value):
 
 import functools
 
-@functools.cache
-def compute_rewrite_rules():
-  _REWRITE_RULES = [
-      (["Anna"],"Ana"),
-      (["Aº"],"Antonio"),
-      (["Baquero","Baquelo","Vaquelo"],"Vaquero"),
-      (["Bartholome"], "Bartolome"),
-      (["Cathalina"], "Catalina"),
-      (["Covarro"], "Cobarro"),
-      (["Estevan"], "Esteban"),
-      (["Gimenez","Ximenez"], "Jimenez"),
-      (["Hoios", "Oios", "Hoyos"], "Oyos"),
-      (["Jines"], "Gines"),
-      (["Joachina"], "Joaquina"),
-      (["Joquin","Joachin"], "Joaquin"),
-      (["Joseph","Josef"], "Jose"),
-      (["Josepha"], "Josefa"),
-      (["Matheo"],"Mateo"),
-      (["Maxima"], "Maximina"),
-      (["Mª"],"Maria"),
-      (["Pasqual"], "Pascual"),
-      (["Pasquala"], "Pascuala"),
-      (["Penalba"],"Penalva"),
-      (["Quadrado"], "Cuadrado"),
-      (["Salbador"], "Salvador"),
-      (["Salbadora"], "Salvadora"),
-      (["Thomas"], "Tomas"),
-      (["Xaime"],"Jaime"),
-      (["Xavier"],"Javier"),
-      (["Ygnacia"],"Ignacia"),
-      (["Ygnacio"],"Ignacio"),
-      (["Ysabel","Ysavel","Isavel"], "Isabel"),
-      (["Ysidra"], "Isidra"),
-      (["No constan", "n/c","nc"],""),
-      (["x", "xx","xxx","xxxx"],""),
-      (["…","……","………","…………"], ""),
-  ]
-  compiled_rules = []
-  for patterns, replacement in _REWRITE_RULES:
-    patterns_regex = "|".join( patterns)
-    regex = f"\\b({patterns_regex})\\b"
-    compiled_rules.append((re.compile(regex, re.IGNORECASE), replacement))
-  return compiled_rules
+import re
+import functools
+import pandas as pd
+from typing import Dict, List, Tuple, Pattern
+import io
 
-def apply_rewrite_rules(v):
-  compiled_rules = compute_rewrite_rules()
-  for regex, replacement in compiled_rules:
-    v = regex.sub(replacement, v)
-  return v
+class NameCleaner:
+    def __init__(self):
+        # Compile all regex patterns once during initialization
+        self.de_pattern = re.compile(r"(\b(de la|del|de los|de las|de)\b)", re.IGNORECASE)
+        self.parenthesis_pattern = re.compile(r"\)|\(|\?|\¿", re.IGNORECASE)
+        self.title_pattern = re.compile(r"^(Dña\.|Dña |Doña |Don |D\.|Dº|D )| (Dña\.|Dña |Doña |Don |D\.|Dº|D )", re.IGNORECASE)
+        self.dots_pattern = re.compile(r"…+", re.IGNORECASE)
+        self.periods_pattern = re.compile(r"\.+", re.IGNORECASE)
+        self.spaces_pattern = re.compile(r" +")
 
-def remove_tildes(v):
-  replacements = {
-    'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
-    'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U'
-  }
-  return ''.join(replacements.get(c, c) for c in v)
+        # Pre-compute tilde replacements
+        self.tilde_map = str.maketrans({
+            'á': 'a', 'é': 'e', 'í': 'i', 'ó': 'o', 'ú': 'u',
+            'Á': 'A', 'É': 'E', 'Í': 'I', 'Ó': 'O', 'Ú': 'U'
+        })
 
-def remove_de(v):
-  # Remove de/del/de la
-  v = re.sub(r"(\b(de la|del|de los|de las|de)\b)","", v, flags=re.IGNORECASE)
-  # Remove parentesis and question marks
-  v = re.sub(r"\)|\(|\?|\¿","", v, flags=re.IGNORECASE)
-  # Remove D. y Dña.
-  v = re.sub(r"^(Dña\.|Dña |Doña |Don |D\.|Dº|D )| (Dña\.|Dña |Doña |Don |D\.|Dº|D )"," ", v, flags=re.IGNORECASE)
-  # Remove points
-  v = re.sub(r"…+","", v, flags=re.IGNORECASE)
-  v = re.sub(r"\.+"," ", v, flags=re.IGNORECASE)
+        # Compile rewrite rules once
+        self.rewrite_rules = self._compile_rewrite_rules()
 
-  # Remove trailing spaces after deleting (if de at the beginning of end)
-  v = v.strip()
-  # Remove repeated spaces after deletion (if de in the middle)
-  v = re.sub(r" +", " ",v)
-  return v
+    @staticmethod
+    def _compile_rewrite_rules() -> List[Tuple[Pattern, str]]:
+        _REWRITE_RULES = [
+            (["Anna"],"Ana"),
+            (["Aº"],"Antonio"),
+            (["Baquero","Baquelo","Vaquelo"],"Vaquero"),
+            (["Bartholome"], "Bartolome"),
+            (["Cathalina"], "Catalina"),
+            (["Covarro"], "Cobarro"),
+            (["Estevan"], "Esteban"),
+            (["Gimenez","Ximenez"], "Jimenez"),
+            (["Hoios", "Oios", "Hoyos"], "Oyos"),
+            (["Jines"], "Gines"),
+            (["Joachina"], "Joaquina"),
+            (["Joquin","Joachin"], "Joaquin"),
+            (["Joseph","Josef"], "Jose"),
+            (["Josepha"], "Josefa"),
+            (["Matheo"],"Mateo"),
+            (["Maxima"], "Maximina"),
+            (["Mª"],"Maria"),
+            (["Pasqual"], "Pascual"),
+            (["Pasquala"], "Pascuala"),
+            (["Penalba"],"Penalva"),
+            (["Quadrado"], "Cuadrado"),
+            (["Salbador"], "Salvador"),
+            (["Salbadora"], "Salvadora"),
+            (["Thomas"], "Tomas"),
+            (["Xaime"],"Jaime"),
+            (["Xavier"],"Javier"),
+            (["Ygnacia"],"Ignacia"),
+            (["Ygnacio"],"Ignacio"),
+            (["Ysabel","Ysavel","Isavel"], "Isabel"),
+            (["Ysidra"], "Isidra"),
+            (["No constan", "n/c","nc"],""),
+            (["x", "xx","xxx","xxxx"],""),
+            (["…","……","………","…………"], ""),
+        ]
+        return [(re.compile(f"\\b({('|'.join(patterns))})\\b", re.IGNORECASE), replacement)
+                for patterns, replacement in _REWRITE_RULES]
 
-def clean_names(v):
-  v = remove_de(v)
-  v = remove_tildes(v)
-  v = apply_rewrite_rules(v)
-  v = v.title() # Capitalize first letter every word
-  return v
+    def remove_tildes(self, text: str) -> str:
+        return text.translate(self.tilde_map) if text else text
 
+    def remove_de(self, text: str) -> str:
+        if not text:
+            return text
+        # Apply all regex substitutions in sequence
+        text = self.de_pattern.sub("", text)
+        text = self.parenthesis_pattern.sub("", text)
+        text = self.title_pattern.sub(" ", text)
+        text = self.dots_pattern.sub("", text)
+        text = self.periods_pattern.sub(" ", text)
+        text = text.strip()
+        return self.spaces_pattern.sub(" ", text)
 
+    def apply_rewrite_rules(self, text: str) -> str:
+        if not text:
+            return text
+        for regex, replacement in self.rewrite_rules:
+            text = regex.sub(replacement, text)
+        return text
 
+    def clean_names(self, text: str) -> str:
+        if pd.isna(text) or not text:
+            return None
+        text = self.remove_de(text)
+        text = self.remove_tildes(text)
+        text = self.apply_rewrite_rules(text)
+        return text.title()
 
-def load_all_sheets_in_colab(data_bytes):
-  io_buffer = io.BytesIO(data_bytes)
-  # Read all sheets into a dictionary of DataFrames
-  cols_baut = {"N°":None,"Observaciones": None,"Año": extract_year}
-  for x in ["Nombre","Apellido 1","Apellido 2", "Nombre Padre", "Nombre Madre",
-           "Abuelos Paternos", "Abuelos Maternos"]:
-    cols_baut[x] = clean_names
-  baut: pd.DataFrame = pd.read_excel(io_buffer, sheet_name="Bautismos", converters=cols_baut, usecols=list(cols_baut.keys()))
-  baut.rename(columns=clean_column_name, inplace=True)
-  baut.dropna(subset=["Año", "Nombre"], inplace=True)
-  baut.drop_duplicates(inplace=True)
-  baut = baut.replace({float('nan'): None})
-
-  cols_matr = {"N°":None,"Observaciones": None,"Año": extract_year}
-  for x in ["Nombre_El","Apellido 1_El","Apellido 2_El","Nombre_Ella","Apellido 1_Ella","Apellido 2_Ella", "Padres_El", "Padres_Ella"]:
-    cols_matr[x] = clean_names
-  matr: pd.DataFrame = pd.read_excel(io_buffer, sheet_name="Matrimonios", converters=cols_matr, usecols=cols_matr)
-  matr.rename(columns=clean_column_name, inplace=True)
-  matr.dropna(subset=["Año", "Nombre_El", "Nombre_Ella"], inplace=True)
-  matr.drop_duplicates(inplace=True)
-  matr = matr.replace({float('nan'): None})
-
-  cols_defu = {"N°":None,"Observaciones": None,"Año": extract_year}
-  for x in ["Nombre","Apellido 1","Apellido 2", "Nombre Padre", "Nombre Madre"]:
-    cols_defu[x] = clean_names
-  defu: pd.DataFrame = pd.read_excel(io_buffer, sheet_name="Defunciones", converters=cols_defu, usecols=list(cols_defu.keys()))
-  defu.rename(columns=clean_column_name, inplace=True)
-  defu.dropna(subset=["Año", "Nombre"], inplace=True)
-  defu.drop_duplicates(inplace=True)
-  defu = defu.replace({float('nan'): None})
+def clean_column_name(name: str) -> str:
+    return re.sub(r"[^\w]", "", name.replace(" ", "_"))
 
 
-  print("All sheets loaded successfully into a dictionary of DataFrames.")
-  return baut, matr, defu
+def load_all_sheets_in_colab(data_bytes: bytes) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+    io_buffer = io.BytesIO(data_bytes)
+    cleaner = NameCleaner()
 
-def clean_column_name(name):
-    name = name.replace(" ", "_")  # Replace spaces with underscores
-    name = re.sub(r"[^\w]", "", name)  # Remove any non-alphanumeric character (except underscore)
-    return name
+    # Define column configurations
+    cols_baut = {
+        "N°": None,
+        "Observaciones": None,
+        "Año": extract_year
+    }
+    name_cols_baut = ["Nombre", "Apellido 1", "Apellido 2", "Nombre Padre",
+                      "Nombre Madre", "Abuelos Paternos", "Abuelos Maternos"]
+    cols_baut.update({col: cleaner.clean_names for col in name_cols_baut})
 
+    cols_matr = {
+        "N°": None,
+        "Observaciones": None,
+        "Año": extract_year
+    }
+    name_cols_matr = ["Nombre_El", "Apellido 1_El", "Apellido 2_El",
+                      "Nombre_Ella", "Apellido 1_Ella", "Apellido 2_Ella",
+                      "Padres_El", "Padres_Ella"]
+    cols_matr.update({col: cleaner.clean_names for col in name_cols_matr})
+
+    cols_defu = {
+        "N°": None,
+        "Observaciones": None,
+        "Año": extract_year
+    }
+    name_cols_defu = ["Nombre", "Apellido 1", "Apellido 2",
+                      "Nombre Padre", "Nombre Madre"]
+    cols_defu.update({col: cleaner.clean_names for col in name_cols_defu})
+
+    # Load and process each sheet
+    baut = pd.read_excel(io_buffer, sheet_name="Bautismos",
+                        converters=cols_baut, usecols=list(cols_baut.keys()),
+                        engine='calamine')
+    baut.rename(columns=clean_column_name, inplace=True)
+    baut = baut.dropna(subset=["Año", "Nombre"]).drop_duplicates()
+
+    # Reset buffer position for next read
+    io_buffer.seek(0)
+    matr = pd.read_excel(io_buffer, sheet_name="Matrimonios",
+                        converters=cols_matr, usecols=list(cols_matr.keys()),
+                         engine='calamine')
+    matr.rename(columns=clean_column_name, inplace=True)
+    matr = matr.dropna(subset=["Año", "Nombre_El", "Nombre_Ella"]).drop_duplicates()
+
+    # Reset buffer position for next read
+    io_buffer.seek(0)
+    defu = pd.read_excel(io_buffer, sheet_name="Defunciones",
+                        converters=cols_defu, usecols=list(cols_defu.keys()),
+                         engine='calamine')
+    defu.rename(columns=clean_column_name, inplace=True)
+    defu = defu.dropna(subset=["Año", "Nombre"]).drop_duplicates()
+
+    # Replace NaN with None consistently
+    for df in [baut, matr, defu]:
+        df.replace({float('nan'): None}, inplace=True)
+
+    return baut, matr, defu
 
 
 ########################
@@ -729,10 +778,16 @@ def find_person_abstract_v2(sheet: dict, info: SearchInfo, year_range:Tuple[int,
         continue
     for r in baut:
       name_match = match_cell(r.nombre, info.nombre)
+      if name_match == Match.NO:
+        continue
       surnames_match = [
           match_cell(r.apellido_1, info.apellido_1),
            match_cell(r.apellido_2, info.apellido_2)]
+      if Match.NO in surnames_match:
+        continue
       father_match = match_cell(r.padre.nombre, info.nombre_padre) if r.padre else Match.MISSING_INFO
+      if Match.NO == father_match:
+        continue
       mother_match = match_cell(r.madre.nombre, info.nombre_madre) if r.madre else Match.MISSING_INFO
       this_matches = [name_match, father_match, mother_match]+surnames_match
       if Match.NO in this_matches:
@@ -811,10 +866,16 @@ class Gen:
 
       for r in baut:
         man_name_match = match_cell(r["Nombre_El"], padre.nombre)
+        if Match.NO == man_name_match:
+          continue
         man_surnames_match = [
             match_cell(r["Apellido_1_El"], padre.apellido_1),
              (match_cell(r["Apellido_2_El"], padre.apellido_2))]
+        if Match.NO in man_surnames_match:
+          continue
         woman_name_match = match_cell(r["Nombre_Ella"], madre.nombre)
+        if Match.NO == woman_name_match:
+          continue
         woman_surnames_match = [
             match_cell(r["Apellido_1_Ella"], madre.apellido_1),
              (match_cell(r["Apellido_2_Ella"], madre.apellido_2))]
@@ -1166,7 +1227,7 @@ def get_webpage(tree):
     """
     return c
 
-def get_year_ranges(nums) -> []:
+def get_year_ranges(nums):
   if not nums:
       return []
 
@@ -1189,3 +1250,4 @@ def get_year_ranges(nums) -> []:
       ranges.append(f"{start}-{nums[-1]}")
 
   return ranges
+

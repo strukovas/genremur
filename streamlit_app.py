@@ -2,8 +2,9 @@ import streamlit.components.v1 as components
 import streamlit as st
 import pandas as pd
 import lib
-# import pip
-# pip.main(["install", "openpyxl"])
+import pip
+pip.main(["install", "python-calamine"])
+
 st.set_page_config(layout="wide")
 # Show title and description.
 st.title("(GenReMur) Buscador Recursivo de antepasados Murcia")
