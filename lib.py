@@ -128,7 +128,6 @@ class NameCleaner:
     def _compile_rewrite_rules() -> List[Tuple[Pattern, str]]:
         _REWRITE_RULES = [
             (["Anna"],"Ana"),
-            (["Aº"],"Antonio"),
             (["Baquero","Baquelo","Vaquelo"],"Vaquero"),
             (["Bartholome"], "Bartolome"),
             (["Cathalina"], "Catalina"),
@@ -143,7 +142,6 @@ class NameCleaner:
             (["Josepha"], "Josefa"),
             (["Matheo"],"Mateo"),
             (["Maxima"], "Maximina"),
-            (["Mª"],"Maria"),
             (["Pasqual"], "Pascual"),
             (["Pasquala"], "Pascuala"),
             (["Penalba"],"Penalva"),
@@ -159,10 +157,19 @@ class NameCleaner:
             (["Ysidra"], "Isidra"),
             (["No constan", "n/c","nc"],""),
             (["x", "xx","xxx","xxxx"],""),
-            (["…","……","………","…………"], ""),
         ]
-        return [(re.compile(f"\\b({('|'.join(patterns))})\\b", re.IGNORECASE), replacement)
+        # When using special chars like Aº the \b separator doesn't work
+        # This rules will also apply inside words (e.g. FoMªo -> FoMariaO)
+        REWRITE_RULES_SPECIAL = [
+            (["…","……","………","…………"], ""),
+            (["Mª","M·"],"Maria"),
+            (["Aº"],"Antonio"),
+        ]
+        r1 = [(re.compile(f"\\b({('|'.join(patterns))})\\b", re.IGNORECASE), replacement)
                 for patterns, replacement in _REWRITE_RULES]
+        r2= [(re.compile(f"({('|'.join(patterns))})", re.IGNORECASE), replacement)
+                for patterns, replacement in REWRITE_RULES_SPECIAL]
+        return r1 + r2
 
     def remove_tildes(self, text: str) -> str:
         return text.translate(self.tilde_map) if text else text
@@ -273,6 +280,7 @@ WOMEN_NAME_FOLLOWUPS = set([
     "Ascension",
     "Bienvenida",
     "Carmen",
+    "Candelaria",
     "Casimira",
     "Catalina",
     "Cayetana",
@@ -299,6 +307,7 @@ WOMEN_NAME_FOLLOWUPS = set([
     "Remedios",
     "Rosa",
     "Rosario",
+    "Soledad",
     "Teresa",
     "Trinidad",
     "Vicenta",
@@ -317,6 +326,7 @@ NAME_FOLLOWUPS = set([
     "Cruz",
     "Diego",
     "Dios",
+    "Francisco",
     "Javier",
     "Jesus",
     "Joaquin",
@@ -331,7 +341,8 @@ NAME_FOLLOWUPS = set([
     "Pablo",
     "Pascual",
     "Pedro",
-    "Rodrigo"
+    "Rafael",
+    "Rodrigo",
     "Vicente",
 ]).union(WOMEN_NAME_FOLLOWUPS)
 
@@ -456,9 +467,13 @@ def match_cell(cell: str, candidate: str):
   starts_with_candidate = re.match(pattern=f"^{re.escape(candidate)}\\b",string=cell)
   if starts_with_candidate:
     return Match.TOTAL
-  elif candidate in WOMEN_NAME_FOLLOWUPS and re.match(pattern=f"^{re.escape(candidate)}\\b",string=cell):
+  # TODO review
+  starts_with_cell = re.match(pattern=f"^{re.escape(cell)}\\b",string=candidate)
+  if starts_with_cell:
+    return Match.TOTAL
+  elif candidate in WOMEN_NAME_FOLLOWUPS and re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell):
       return Match.TOTAL
-  elif cell in WOMEN_NAME_FOLLOWUPS and re.match(pattern=f"^Maria {re.escape(candidate)}\\b",string=cell):
+  elif cell in WOMEN_NAME_FOLLOWUPS and re.match(pattern=f"^Maria {re.escape(cell)}\\b",string=candidate):
     return Match.TOTAL
   # Si difiere en un solo caracter (mismas posiciones) lo damos por bueno
   elif r:=startswith_differ_by_one_char(cell, candidate):
@@ -804,6 +819,19 @@ def find_person_abstract_v2(sheet: dict, info: SearchInfo, year_range:Tuple[int,
   return Findings(full_matches, partial_matches, broad_matches)
 
 
+def get_person_from_findings_v2(fin: Findings, logger: Logger, name_record: str):
+  broad_match= None
+  if fin.full_matches:
+    records = fin.full_matches
+  elif fin.partial_matches:
+    records = fin.partial_matches
+  else:
+    records = fin.broad_matches
+    #broad_match = " (concindencia parcial) "
+    broad_match = True
+
+  return records, broad_match
+
 def get_person_from_findings(fin: Findings, logger: Logger, name_record: str):
   broad_match= ""
   if fin.full_matches:
@@ -906,6 +934,34 @@ class Gen:
         year_child=year)
     return self.get_ancestors(padre_info)
 
+  def infer_from_siblings(self, siblings, logger):
+    sets_of_abuelos = get_sets_abuelos(siblings)
+    if len(sets_of_abuelos.keys()) == 1:
+      logger.log_accum(f"Deducido datos de potencial hermano: {siblings[0].nombre}. (Todos los candidatos tienen los mismos abuelos)")
+      return siblings[0]
+    else:
+      list_abuelos = sorted(sets_of_abuelos.items(),key=lambda x:x[0])
+      primeros_abuelos = list_abuelos[0][0]
+      abuelos_names = set(str(i) + x for i,x in enumerate(primeros_abuelos.split("|")))
+      same_abuelos = True
+      for s,_ in list_abuelos[1:]:
+        new_names = [str(i) + x for i,x in enumerate(s.split("|"))]
+        n_match = len(abuelos_names.intersection(new_names))
+        if n_match < 3:
+          same_abuelos = False
+          break
+
+      if not same_abuelos:
+        logger.log_accum(f"No se pueden deducir datos de los candidatos pues no todos tienen los mismos abuelos.")
+      else:
+        inferred_from_siblings = True
+        logger.log_accum(f"Deducido datos de potenticial hermano: {siblings[0]}.")
+        logger.log_accum("Los abuelos de los hermanos difieren solo en un nombre.")
+        return siblings[0]
+      for s,n in list_abuelos:
+        logger.log_accum(str(n)+"  "+str(s))
+    return None
+
 
   def get_ancestors(self, info: SearchInfo) -> Tree:
     if not info.nombre:
@@ -922,7 +978,23 @@ class Gen:
     id = str(uuid.uuid4())[:8]
     logger = Logger(id, str(info))
 
-    baut = get_person_from_findings(self.find_person(info), logger, "bautizo")
+    bauts,is_broad = get_person_from_findings_v2(self.find_person(info), logger, "bautizo")
+    baut = None
+    if bauts and len(bauts)>1:
+      logger.log_accum("Varios bautizos encontrados:")
+      for r in bauts:
+        logger.log_accum(f" → {r}")
+      baut = self.infer_from_siblings(bauts, logger)
+      if baut:
+        #TODO: rename this variable
+        inferred_from_siblings = True
+    elif bauts and len(bauts) == 1:
+      baut = bauts[0]
+      partial= " (coincidencia parcial)" if is_broad else ""
+      logger.log_accum(f"Bautizo encontrado{partial}:")
+      logger.log_accum(baut)
+    logger.log_flush()
+
     # TODO: If baut then limit defu search based on birth date
     defuncion = get_person_from_findings(self.find_person_defu(info), logger, "defuncion")
 
@@ -946,33 +1018,9 @@ class Gen:
         logger.log_accum(f" → {s}")
 
     if not baut_ref and siblings and _INFER_PARENTS_FROM_SIBLINGS:
-      sets_of_abuelos = get_sets_abuelos(siblings)
-      if len(sets_of_abuelos.keys()) == 1:
-        baut_ref = siblings[0]
+      if baut_ref:= self.infer_from_siblings(siblings, logger):
         inferred_from_siblings = True
-        logger.log_accum(f"Deducido datos de potencial hermano: {baut_ref.nombre}.")
-      else:
-        list_abuelos = sorted(sets_of_abuelos.items(),key=lambda x:x[0])
-        primeros_abuelos = list_abuelos[0][0]
-        abuelos_names = set(str(i) + x for i,x in enumerate(primeros_abuelos.split("|")))
-        same_abuelos = True
-        for s,_ in list_abuelos[1:]:
-          new_names = [str(i) + x for i,x in enumerate(s.split("|"))]
-          n_match = len(abuelos_names.intersection(new_names))
-          if n_match < 3:
-            same_abuelos = False
-            break
-
-        if not same_abuelos:
-          logger.log_accum(f"No se pueden deducir datos de los hermanos pues no todos los hermanos tienen los mismos abuelos.")
-        else:
-          baut_ref = siblings[0]
-          inferred_from_siblings = True
-          logger.log_accum(f"Deducido datos de potentical hermano: {baut_ref}.")
-          logger.log_accum("Los abuelos de los hermanos difieren solo en un nombre.")
-        for s,n in list_abuelos:
-          logger.log_accum(str(n)+"  "+str(s))
-    logger.log_flush()
+      logger.log_flush()
 
 
     r = baut_ref or defuncion
@@ -1011,24 +1059,24 @@ class Gen:
       matr = matrs[0]
       # TODO: Make it work so that if if only one is missing (paternos or maternos)
       # it stills helps to infer
-      if has_paternos or has_maternos: #No necesitamos inferir nada, solo informacion
+      if has_paternos and has_maternos:
         logger.log_accum(f"Encontrado matrimonio de los padres:")
         logger.log_accum(matr)
-      elif not (matr["Padres_Ella"] or type(matr["Padres_Ella"]) is not float):
-        logger.log_accum(f"Encontrado matrimonio de los padres pero NO aparecen los abuelos:")
+      elif not matr["Padres_Ella"] and not matr["Padres_El"]:
+        logger.log_accum(f"Encontrado matrimonio de los padres pero NO aparecen los abuelos.")
         logger.log_accum(matr)
       else:
-        logger.log_accum(f"Encontrado matrimonio de los padres. Deducido los abuelos:")
+        deducido_paternos = "Deducido abuelos paternos" if matr["Padres_El"] and not has_paternos else ""
+        deducido_maternos = "Deducido abuelos maternos" if matr["Padres_Ella"] and not has_maternos else ""
+        logger.log_accum(f"Encontrado matrimonio de los padres. {deducido_maternos}{deducido_paternos}:")
         logger.log_accum(matr)
-        abuelos_paternos = matr["Padres_El"]
-        if paternos := get_abuelos(abuelos_paternos):
+        if (paternos := get_abuelos(matr["Padres_El"])) and not has_paternos:
           paterno,paterna = paternos
           if not zpadre.apellido_2:
             zpadre.apellido_1 = zpadre.apellido_1 or matr["Apellido_1_El"]
             zpadre.apellido_2 = zpadre.apellido_2 or matr["Apellido_2_El"]
           padre = self.get_tree_parent_from_baut_v2(paterno,paterna, zpadre, year_birth)
-        abuelos_maternos = matr["Padres_Ella"]
-        if maternos := get_abuelos(abuelos_maternos):
+        if (maternos := get_abuelos(matr["Padres_Ella"])) and not has_maternos:
           materno,materna = maternos
           zmadre.apellido_1 = zmadre.apellido_1 or matr["Apellido_1_Ella"]
           zmadre.apellido_2 = zmadre.apellido_2 or matr["Apellido_2_Ella"]
@@ -1094,10 +1142,7 @@ def print_tree(d: Tree, level: int = 0, is_last: bool = False, padding=""):
   elif d.n_siblings and d.inferred_from_siblings:
     n_siblings = f" [!{d.n_siblings}] "
 
-  if years:
-    print(f"{padding}{arrow}{full_name}{years}{n_siblings} [{record}] ")
-  else: # We don't have any record:
-    print(f"{padding}{arrow}{full_name}{years}{n_siblings} ")
+  print(f"{padding}{arrow}{full_name}{years}{n_siblings}")
 
   if level:
     if is_last:
